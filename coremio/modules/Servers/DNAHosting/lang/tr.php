@@ -1,0 +1,20 @@
+<?php
+    return [
+        'name'        => "DNA Bayi Hosting",
+        'description' => "cPanel/WHM veya Plesk bayi hesabı üzerinden paylaşımlı hosting satın. Panel tipi otomatik tespit edilir.",
+        'select-plan'      => "Paket / Plan",
+        'no-plans'         => "Bu sunucuda hiç paket bulunamadı.",
+        'panel-cpanel'     => "cPanel / WHM",
+        'panel-plesk'      => "Plesk",
+        'detected-panel'   => "Tespit edilen panel",
+        'login-panel'      => "Kontrol Paneline Giriş",
+        'username'         => "Kullanıcı Adı",
+        'password'         => "Şifre",
+        'domain'           => "Alan Adı",
+        'ftp-host'         => "FTP Sunucusu",
+        'ftp-port'         => "FTP Portu",
+        'disk-usage'       => "Disk Kullanımı",
+        'bandwidth-usage'  => "Trafik Kullanımı",
+        'error-no-order'   => "Bu hizmetin henüz bir panel hesabı yok.",
+        'error-shared-domain' => "Bu alan adı aynı sunucuda başka bir aktif hizmet tarafından hâlâ kullanılıyor, bu yüzden sonlandırılmadı.",
+    ];

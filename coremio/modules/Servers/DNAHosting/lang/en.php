@@ -1,0 +1,20 @@
+<?php
+    return [
+        'name'        => "DNA Reseller Hosting",
+        'description' => "Sell shared hosting from a cPanel/WHM or Plesk reseller account. The panel type is detected automatically.",
+        'select-plan'      => "Package / Plan",
+        'no-plans'         => "No packages found on this server.",
+        'panel-cpanel'     => "cPanel / WHM",
+        'panel-plesk'      => "Plesk",
+        'detected-panel'   => "Detected panel",
+        'login-panel'      => "Log in to Control Panel",
+        'username'         => "Username",
+        'password'         => "Password",
+        'domain'           => "Domain",
+        'ftp-host'         => "FTP Host",
+        'ftp-port'         => "FTP Port",
+        'disk-usage'       => "Disk Usage",
+        'bandwidth-usage'  => "Bandwidth Usage",
+        'error-no-order'   => "This service has no panel account yet.",
+        'error-shared-domain' => "This domain is still in use by another active service on the same server, so it was not terminated.",
+    ];

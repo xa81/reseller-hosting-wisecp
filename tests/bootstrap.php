@@ -14,3 +14,4 @@ require_once $moduleDir . 'lib/Http.php';
 require_once $moduleDir . 'lib/Cpanel.php';
 require_once $moduleDir . 'lib/Plesk.php';
 require_once $moduleDir . 'lib/Detector.php';
+require_once $moduleDir . 'lib/Support.php';
