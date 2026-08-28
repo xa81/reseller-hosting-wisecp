@@ -175,4 +175,288 @@ class DNAHosting_Module extends ServerModule
         }
         return $this->{$prefix . $param}();
     }
+
+    public function externalId()
+    {
+        return 'wisecp-' . (isset($this->order['id']) ? (int) $this->order['id'] : 0);
+    }
+
+    public function UsernameGenerator($domain = '', $half_mixed = false)
+    {
+        return DNAHosting_Support::usernameFor($domain, $this->panel());
+    }
+
+    private function planOf(array $options)
+    {
+        $creation = isset($options['creation_info']) ? $options['creation_info'] : array();
+        if (isset($creation['plan']) && trim($creation['plan']) !== '') {
+            return $creation['plan'];
+        }
+
+        $moduleData = isset($this->product['module_data']) ? $this->product['module_data'] : array();
+        if (is_string($moduleData)) {
+            $moduleData = json_decode($moduleData, true);
+        }
+        if (isset($moduleData['create_account']['plan'])) {
+            return $moduleData['create_account']['plan'];
+        }
+        if (isset($moduleData['plan'])) {
+            return $moduleData['plan'];
+        }
+        return '';
+    }
+
+    public function createAccount($domain, $options = array())
+    {
+        try {
+            $panel    = $this->panel();
+            $domain   = DNAHosting_Support::domainKey($domain);
+            $username = isset($options['username']) && $options['username'] !== ''
+                ? $options['username']
+                : DNAHosting_Support::usernameFor($domain, $panel);
+            $password = isset($options['password']) && $options['password'] !== ''
+                ? $options['password']
+                : DNAHosting_Support::password(14);
+
+            $account = array(
+                'username'    => $username,
+                'password'    => $password,
+                'domain'      => $domain,
+                'plan'        => $this->planOf($options),
+                'email'       => isset($this->user['email']) ? $this->user['email'] : '',
+                'name'        => isset($this->user['full_name']) ? $this->user['full_name'] : $username,
+                'external_id' => $this->externalId(),
+            );
+
+            $created = $this->driver()->createAccount($account);
+
+            return array(
+                'username' => $created['username'],
+                'password' => $created['password'],
+                'ftp_info' => array(
+                    'ip'       => $this->server['ip'],
+                    'host'     => 'ftp.' . $domain,
+                    'username' => $created['username'],
+                    'password' => $created['password'],
+                    'port'     => 21,
+                ),
+            );
+        } catch (Exception $e) {
+            return $this->failed($e);
+        }
+    }
+
+    /** Plesk islemleri icin abonelik kimligini domainden yeniden turetir. */
+    private function pleskTargets()
+    {
+        if (isset($this->storage['plesk_targets'])) {
+            return $this->storage['plesk_targets'];
+        }
+
+        $domain   = DNAHosting_Support::domainKey($this->orderDomain());
+        $webspace = $this->driver()->findWebspace($domain);
+        if (!$webspace) {
+            throw new DNAHosting_Exception(
+                '"' . $domain . '" alan adina ait abonelik panelde bulunamadi.'
+            );
+        }
+
+        $targets = array('webspace_id' => $webspace['id'], 'customer_id' => $webspace['owner_id']);
+        $this->storage['plesk_targets'] = $targets;
+        return $targets;
+    }
+
+    private function orderDomain()
+    {
+        if (isset($this->options['domain']) && $this->options['domain'] !== '') {
+            return $this->options['domain'];
+        }
+        if (isset($this->order['options']['domain'])) {
+            return $this->order['options']['domain'];
+        }
+        return '';
+    }
+
+    private function panelUser()
+    {
+        if (!isset($this->config['user']) || $this->config['user'] === '') {
+            throw new DNAHosting_Exception($this->lang['error-no-order']);
+        }
+        return $this->config['user'];
+    }
+
+    public function suspend()
+    {
+        try {
+            if ($this->panel() === 'plesk') {
+                $t = $this->pleskTargets();
+                return $this->driver()->suspend($t['webspace_id']);
+            }
+            return $this->driver()->suspendAccount($this->panelUser(), 'WiseCP');
+        } catch (Exception $e) {
+            return $this->failed($e);
+        }
+    }
+
+    public function unsuspend()
+    {
+        try {
+            if ($this->panel() === 'plesk') {
+                $t = $this->pleskTargets();
+                return $this->driver()->unsuspend($t['webspace_id']);
+            }
+            return $this->driver()->unsuspendAccount($this->panelUser());
+        } catch (Exception $e) {
+            return $this->failed($e);
+        }
+    }
+
+    public function suspend_reseller()   { return $this->suspend(); }
+    public function unsuspend_reseller() { return $this->unsuspend(); }
+    public function removeReseller($user = false) { return $this->removeAccount($user); }
+    public function setReseller($user, $params = array())   { return true; }
+    public function setupReseller($user = false, $params = array()) { return true; }
+
+    public function removeAccount($user = false)
+    {
+        try {
+            $domainKey = DNAHosting_Support::domainKey($this->orderDomain());
+            $shared    = $this->otherActiveServices($domainKey);
+            if ($shared) {
+                throw new DNAHosting_Exception(
+                    $this->lang['error-shared-domain']
+                    . ' Ayni alan adini kullanan diger hizmet numaralari: ' . implode(', ', $shared)
+                );
+            }
+
+            if ($this->panel() === 'plesk') {
+                $t = $this->pleskTargets();
+                return $this->driver()->terminate($t['customer_id'], $this->externalId());
+            }
+            return $this->driver()->terminateAccount($user ? $user : $this->panelUser());
+        } catch (Exception $e) {
+            return $this->failed($e);
+        }
+    }
+
+    /**
+     * Ayni sunucuda ayni alan adini kullanan diger aktif/askidaki hizmetlerin kimlikleri.
+     * server_id JSON icinde hem tirnakli hem tirnaksiz kodlanabildigi icin iki desen de aranir
+     * (cekirdegin kendi deseni: coremio/models/admin/products.php:376-378).
+     */
+    protected function otherActiveServices($domainKey)
+    {
+        if ($domainKey === '' || !class_exists('Models') || !isset(Models::$init->db)) {
+            return array();
+        }
+
+        $serverId = (int) $this->server['id'];
+        $orderId  = isset($this->order['id']) ? (int) $this->order['id'] : 0;
+
+        $stmt = Models::$init->db->select('id,options')->from('users_products');
+        $stmt->where('type', '=', 'hosting', '&&');
+        $stmt->where('module', '=', $this->_name, '&&');
+        if ($orderId) {
+            $stmt->where('id', '!=', $orderId, '&&');
+        }
+        $stmt->where('(');
+        $stmt->where('status', '=', 'active', '||');
+        $stmt->where('status', '=', 'suspended', '');
+        $stmt->where(')', '', '', '&&');
+        $stmt->where('(');
+        $stmt->where('options', 'LIKE', '%"server_id":"' . $serverId . '"%', '||');
+        $stmt->where('options', 'LIKE', '%"server_id":' . $serverId . '%', '');
+        $stmt->where(')', '', '', '');
+
+        $rows = $stmt->build() ? $stmt->fetch_assoc() : array();
+        if (!$rows) {
+            return array();
+        }
+
+        $matches = array();
+        foreach ($rows as $row) {
+            $options = json_decode($row['options'], true);
+            if (!is_array($options) || !isset($options['domain'])) {
+                continue;
+            }
+            if (DNAHosting_Support::domainKey($options['domain']) === $domainKey) {
+                $matches[] = (int) $row['id'];
+            }
+        }
+        return $matches;
+    }
+
+    public function changePassword($oldpw, $newpw)
+    {
+        try {
+            if ($this->panel() === 'plesk') {
+                $t = $this->pleskTargets();
+                return $this->driver()->changePassword($t['customer_id'], $t['webspace_id'], $newpw);
+            }
+            return $this->driver()->changePassword($this->panelUser(), $newpw);
+        } catch (Exception $e) {
+            return $this->failed($e);
+        }
+    }
+
+    public function change_plan($plan)
+    {
+        if (trim((string) $plan) === '') {
+            return true;
+        }
+        try {
+            if ($this->panel() === 'plesk') {
+                $t = $this->pleskTargets();
+                return $this->driver()->changePlan($t['webspace_id'], $this->driver()->resolvePlan($plan));
+            }
+            return $this->driver()->changePackage($this->panelUser(), $plan);
+        } catch (Exception $e) {
+            return $this->failed($e);
+        }
+    }
+
+    public function apply_updowngrade($orderopt = array(), $product = array())
+    {
+        if ($product) {
+            $this->product = $product;
+        }
+        return $this->change_plan($this->planOf(is_array($orderopt) ? $orderopt : array()));
+    }
+
+    public function modifyAccount($params = array())
+    {
+        return false;
+    }
+
+    public function apply_options($old_options, $new_options = array())
+    {
+        $oldConfig = isset($old_options['config']) ? $old_options['config'] : array();
+        $newConfig = isset($new_options['config']) ? $new_options['config'] : array();
+
+        $newUser = isset($newConfig['user']) ? $newConfig['user'] : '';
+        if ($newUser === '') {
+            return $new_options;
+        }
+
+        $plain = isset($newConfig['password']) ? $newConfig['password'] : '';
+        if ($plain !== '' && $plain !== (isset($oldConfig['password']) ? $oldConfig['password'] : '')) {
+            $this->config['user'] = $newUser;
+            if (!$this->changePassword('', $plain)) {
+                return false;
+            }
+            $newConfig['password'] = $this->encode_str($plain);
+        }
+
+        $domain = isset($new_options['domain']) ? $new_options['domain'] : $this->orderDomain();
+        $new_options['config']   = $newConfig;
+        $new_options['ftp_info'] = array(
+            'ip'       => $this->server['ip'],
+            'host'     => 'ftp.' . DNAHosting_Support::domainKey($domain),
+            'username' => $newUser,
+            'password' => isset($newConfig['password']) ? $newConfig['password'] : '',
+            'port'     => 21,
+        );
+
+        return $new_options;
+    }
 }

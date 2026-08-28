@@ -103,3 +103,117 @@ test('Modul use_method tire donusumunu uygular', function () {
     $m = new DNAHosting_ModuleRouting(false);
     assertSame('sifre-degistirildi', $m->use_method('change-password'));
 });
+
+class DNAHosting_ModuleWithNeighbours extends DNAHosting_Module
+{
+    public $neighbours = array();
+    protected function otherActiveServices($domainKey)
+    {
+        return $this->neighbours;
+    }
+}
+
+function dna_module_n($port, $transportSetup)
+{
+    $server = array(
+        'id' => 3, 'name' => 'test', 'ip' => '1.2.3.4', 'port' => $port, 'secure' => 1,
+        'username' => 'bayi', 'password' => 'GIZLI123456',
+    );
+    $module = new DNAHosting_ModuleWithNeighbours($server);
+    $t      = new DNAHosting_FakeTransport();
+    call_user_func($transportSetup, $t);
+    $module->useTransport($t);
+    $module->order = array('id' => 501, 'owner_id' => 7);
+    $module->user  = array('email' => 'musteri@ornek.com', 'full_name' => 'Ornek Musteri');
+    return array($module, $t);
+}
+
+test('Modul createAccount cPanelde ftp_info ile doner', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{"pkg":[{"name":"bayi_pro","QUOTA":"1","BWLIMIT":"1"}]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    });
+    $r = $m->createAccount('ornek.com', array('creation_info' => array('plan' => 'bayi_pro')));
+    assertTrue(is_array($r), 'dizi bekleniyordu, error: ' . $m->error);
+    assertTrue(strlen($r['username']) > 0);
+    assertTrue(strlen($r['password']) >= 12);
+    assertSame('ftp.ornek.com', $r['ftp_info']['host']);
+    assertSame(21, $r['ftp_info']['port']);
+    assertSame($r['username'], $r['ftp_info']['username']);
+});
+
+test('Modul createAccount paket secilmemisse anlamli hata verir', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+    });
+    assertSame(false, $m->createAccount('ornek.com', array()));
+    assertContains('paket', strtolower($m->error));
+});
+
+test('Modul suspend ve unsuspend cPanelde calisir', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    });
+    $m->config['user'] = 'ornek1';
+    assertTrue($m->suspend());
+    assertContains('suspendacct', $t->lastCall()['url']);
+});
+
+test('Modul suspend_reseller suspende alias', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    });
+    $m->config['user'] = 'ornek1';
+    assertTrue($m->suspend_reseller());
+    assertContains('suspendacct', $t->lastCall()['url']);
+});
+
+test('Modul removeAccount ayni domainli komsu varsa reddeder', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+    });
+    $m->config['user']    = 'ornek1';
+    $m->options['domain'] = 'ornek.com';
+    $m->neighbours        = array(777);
+    assertSame(false, $m->removeAccount());
+    assertContains('777', $m->error);
+    // Guard panel() cagrilmadan once firlar, bu yuzden hic HTTP istegi cikmaz.
+    assertSame(0, count($t->calls), 'hicbir istek gonderilmemeli');
+});
+
+test('Modul removeAccount komsu yoksa siler', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    });
+    $m->config['user']    = 'ornek1';
+    $m->options['domain'] = 'ornek.com';
+    assertTrue($m->removeAccount());
+    assertContains('removeacct', $t->lastCall()['url']);
+});
+
+test('Modul change_plan bos plani sessizce gecer', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+    });
+    $m->config['user'] = 'ornek1';
+    assertTrue($m->change_plan(''));
+    // Bos plan panel() cagrilmadan true doner.
+    assertSame(0, count($t->calls));
+});
+
+test('Modul externalId siparis kimliginden turer', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) { });
+    assertSame('wisecp-501', $m->externalId());
+});
+
+test('Modul UsernameGenerator panele uygun ad uretir', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+    });
+    $u = $m->UsernameGenerator('cokuzunbirdomain.com');
+    assertTrue(strlen($u) <= 8, 'cPanel icin 8i asmamali: ' . $u);
+});
