@@ -29,7 +29,7 @@ API call, not a guess) and remembers which panel answered.
 | Package / plan change | Yes | Yes |
 | Disk & bandwidth usage (shown on the client's service page) | Yes | Yes |
 | One-click login — client area | Yes | Yes |
-| One-click login — admin area (to the reseller's own panel) | Yes | Yes |
+| One-click login — admin area (opens the customer's panel for that service) | Yes | Yes |
 
 Two safety behaviours worth knowing about up front:
 
@@ -37,8 +37,17 @@ Two safety behaviours worth knowing about up front:
   or suspended on another service on the same server — it protects against one domain's hosting
   being torn out from under a second, still-live order.
 - **Plesk ownership guard.** Every account the module creates on Plesk is tagged with an internal
-  identifier. Deleting a subscription that doesn't carry a matching tag is refused — so the module
-  can never be pointed at someone else's manually-created Plesk subscription and asked to delete it.
+  identifier. Before *any* operation on a Plesk subscription — suspend, unsuspend, password change,
+  plan change, usage, termination — the module checks that tag and refuses if it doesn't match, so
+  it can never be pointed at someone else's manually-created subscription. Terminating deletes the
+  subscription first and removes the Plesk customer only once it owns nothing else; if that count
+  can't be established, the customer is left alone.
+- **Plesk domain changes are refused.** A Plesk subscription is located by its domain name, so
+  editing the domain on an existing service would leave the module unable to find it again — every
+  later operation, termination included, would fail permanently. Saving such a change is rejected
+  with a message telling you to rename the subscription in Plesk first, or to terminate and
+  re-provision. On cPanel the domain field is editable; the account keeps serving the old domain
+  until you change it in the panel.
 
 **Not included:** email account / forwarder management, selling reseller accounts, importing
 existing accounts into WiseCP, and an admin "log in to the root panel" button. The module only ever

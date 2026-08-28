@@ -101,7 +101,12 @@ Başka hiçbir anahtar kalıcılaşmaz. **Plesk'in webspace ve customer ID'lerin
 
 **Karar:** kimlik yeniden türetilebilir olmalı.
 - **cPanel:** `config.user` = cPanel kullanıcı adı. WHM API zaten bu anahtarla çalışır, ek bilgiye gerek yok.
-- **Plesk:** oluşturma anında `external_id = "wisecp-" . $order["id"]` yazılır; sonraki her işlem müşteriyi bu değerle bulur. Aynı zamanda **sahiplik kanıtıdır** — `external_id` tutmayan bir aboneliği silmeyi reddederiz.
+- **Plesk:** oluşturma anında `external_id = "wisecp-" . $order["id"]` yazılır. Bu değer hem **kimlik** hem **sahiplik kanıtıdır**, ama iki yolda farklı kullanılır:
+
+  - **Hesap açarken** müşteri doğrudan `external_id` ile aranır (`findCustomer()`); bulunursa yeniden kullanılır, bulunmazsa oluşturulur. Bu, zaman aşımına uğrayan bir sağlamanın geride öksüz müşteri bırakmasını ve ikinci denemenin mükerrer login ile patlamasını önler.
+  - **Sonraki her işlemde** Plesk'in webspace ve customer ID'lerini sipariş verisine yazamadığımız için kimlik yeniden türetilir: abonelik alan adıyla bulunur (`findWebspace()`), **sonra sahibinin `external_id`'si bizimkiyle karşılaştırılır**. Doğrulama `pleskTargets()` içinde bir kez yapılır ve doğrulanmış (webspace_id, customer_id) çifti istek boyunca ezberlenir; askıya alma, askıdan indirme, şifre değiştirme, paket değiştirme, kullanım ve sonlandırma bu tek guard'ı miras alır.
+
+  `findWebspace()` tek başına sahiplik hakkında hiçbir şey söylemez — o alan adını taşıyan hangi abonelik varsa onu döndürür — bu yüzden doğrulama atlanamaz. Alan adı normalizasyonu için bkz. §5.8.
 
 ### 2.6 Sunucu kaydı ve kimlik bilgisi
 
@@ -197,7 +202,7 @@ SSO metotları çıktıyı kendileri basar (`Utility::redirect($link)` veya otom
 **İki uyarı:**
 
 1. `store()` ve `isCached()`, kurulum alan adını lisans dosyasındaki alan adıyla karşılaştırıyor; eşleşmezse `store()` sessizce hiçbir şey yapmıyor, `isCached()` her zaman `false` dönüyor. Lisanssız bir geliştirme kurulumunda önbellek kalıcı olarak ıskalar.
-2. Decode edilmiş `retrieve()` gövdesinde `$timestamp === false` dalı görünürde hiçbir şey döndürmüyor — bu büyük olasılıkla decoder artefaktı, ama doğrulanmadan güvenilmemeli.
+2. `retrieve()` **hiçbir zaman veri döndürmüyor** — doğrulandı, bkz. §8 risk 2. Decode edilmiş gövdedeki `$timestamp === false` dalı `$type = "data"` atayıp fonksiyonun sonundan düşüyor; `return` ifadesi yok, dolayısıyla her çağrı `null` veriyor.
 
 **Karar:** önbellek **saf bir optimizasyondur, doğruluk bağımlılığı değildir.** Modül, önbellek kalıcı olarak ıskaladığında da doğru çalışmalı — yalnızca sunucu başına istek başına bir fazladan probe yapmalıdır. Panel tespiti ayrıca istek içi bellekte de tutulur (`$this->storage`), böylece tek bir istekte tek probe yapılır. Uygulamanın ilk adımı `Cache::retrieve()`'nin canlıda gerçekten veri döndürdüğünü doğrulamaktır; döndürmüyorsa `Cache` tamamen bırakılır ve yalnızca istek içi bellek kullanılır.
 
@@ -263,11 +268,11 @@ Her bileşen tek bir işten sorumludur ve arayüzü üzerinden bağımsız anla�
 | `apply_updowngrade($orderopt,$product)` | `ChangePackage` sarmalayıcısı | `change_plan()`'a delege eder |
 | `apply_options($old,$new)` | `AdminServicesTabFields` | admin sipariş düzenleme |
 | `getDisk()` / `getBandwidth()` | `UsageUpdate` sürücüleri | tek servis, talep anında |
-| `getSummary()` | — | ürün limitlerini döndürür |
+| `getSummary()` | — | **spekülatif:** çekirdekte çağrı yeri yok, görüntüleme yardımcısı olarak duruyor |
 | `UsernameGenerator($domain)` | dahili | panele uygun kullanıcı adı |
 | `use_method($param)` | — | buton yönlendirici |
 | `use_clientArea_SingleSignOn()` | `ServiceSingleSignOn` | |
-| `use_adminArea_SingleSignOn()` | `AdminSingleSignOn` | reseller hesabına giriş |
+| `use_adminArea_SingleSignOn()` | `AdminSingleSignOn` | **müşterinin** paneline giriş — admin tarafından, o sipariş için |
 | `clientArea()` | `ClientArea` | |
 | `clientArea_buttons()` | `ClientAreaCustomButtonArray` | |
 
@@ -334,7 +339,11 @@ create_account.plan             paket / plan adı
    - `$options["username"]` / `$options["password"]` doluysa (admin elle girmişse) onlar kullanılır.
 3. Paket adı `$options["creation_info"]["plan"]`'dan alınır, sürücünün `resolvePackage()` / `resolvePlan()` metoduyla panelin gerçek paket adına eşlenir (reseller ön eki temizlenir).
 4. **cPanel:** `createacct`. Zaman aşımı riskine karşı, başarısızlıkta `accountSummary` ile kurtarma denenir — hesap gerçekte oluşmuşsa ve domain eşleşiyorsa başarı sayılır.
-5. **Plesk:** müşteri + webspace oluşturulur, `external_id = "wisecp-" . $order["id"]` yazılır. IP adresi `<ip><get/>` ile alınır, **yalnızca `type='shared'` olanlar** aday kabul edilir; hiç bulunamazsa sunucunun `ip` alanına düşülür. `webspace.add` paketi WHMCS 1.6.3.0 şablonuyla birebir aynı sırada gönderilir (`gen_setup` içinde `ip_address` zorunludur — çıkarılırsa 1014 alınır).
+5. **Plesk:** akış **yeniden çalıştırılabilir** olacak şekilde yazılmıştır — her adım nesnenin zaten var olup olmadığına bakar, çünkü yarım kalan bir sağlama yeniden denendiğinde koşulsuz bir `customer.add` geride öksüz müşteri bırakır ve ikinci deneme mükerrer login ile patlar:
+   1. Müşteri `external_id = "wisecp-" . $order["id"]` ile aranır (`findCustomer()`); yoksa `customer.add` ile oluşturulur, varsa **yeniden kullanılır**.
+   2. Abonelik alan adıyla aranır. Varsa ve **sahibi bizim müşterimiz değilse işlem reddedilir** — devralmak, sonlandırma dâhil sonraki her işlemi bize ait olmayan canlı bir siteye doğrultur. Varsa ve sahibi bizimse devralınır (yarım kalan sağlamanın tamamlanması).
+   3. Yoksa `webspace.add` gönderilir. IP adresi `<ip><get/>` ile alınır, **yalnızca `type='shared'` olanlar** aday kabul edilir; hiç bulunamazsa sunucunun `ip` alanına düşülür. Paket WHMCS 1.6.3.0 şablonuyla birebir aynı sırada gönderilir (`gen_setup` içinde `ip_address` zorunludur — çıkarılırsa 1014 alınır).
+   4. `webspace.add` başarısız olursa kurtarma **dar tutulur**: yalnızca Plesk "zaten var" dediğinde ve isteğin Plesk'in API katmanından hiç yanıt almadığı durumda (zaman aşımı, taşıma hatası, HTTP ≥ 400, bozuk XML) abonelik aranıp devam edilir. Başka her hata yayılır — Plesk web sunucusunu yapılandırırken patladığında geride yarım bir abonelik bırakır, o durumda arama **başarılı** olur ve gerçek hata kaybolur; hosting'i olmayan bir abonelik için "başarılı" raporlamış oluruz.
 6. Dönüş: `['username','password','ftp_info']`.
 
 ### 5.3 Askıya alma / kaldırma
@@ -346,11 +355,14 @@ create_account.plan             paket / plan adı
 
 1. **Mükerrer domain guard'ı:** aynı sunucuda aynı domain'e sahip başka bir `active`/`suspended` sipariş varsa işlem reddedilir. Domain karşılaştırması normalize edilir (küçük harf, sondaki nokta atılır, UTF-8 farkındalıklı).
 2. **cPanel:** `removeacct`.
-3. **Plesk:** müşteri `external_id` ile bulunur. `external_id` bizimkiyle eşleşmiyorsa **silme reddedilir** — bu, elle oluşturulmuş veya başka bir sistemin yönettiği bir aboneliği silmeye karşı sigortadır.
+3. **Plesk sahiplik guard'ı:** `pleskTargets()` aboneliği alan adıyla bulur ve sahibinin `external_id`'sini bizimkiyle karşılaştırır; tutmuyorsa işlem reddedilir — bu, elle oluşturulmuş veya başka bir sistemin yönettiği bir aboneliği silmeye karşı sigortadır (bkz. §2.5; aynı guard askıya alma, şifre değiştirme, paket değiştirme ve kullanım yollarını da korur).
+4. **Plesk silme sırası:** önce **abonelik `id` ile silinir** (`webspace.del`; 1014'ten kaçınmak için `<domain>` değil `<webspace>` operatörü, `id` filtresi zorunlu — filtresiz bir silme sunucudaki her aboneliği kapsar). Sonra müşterinin **kalan abonelikleri sayılır** ve müşteri **yalnızca sıfırda** kaldırılır; müşteri silmek ona ait her aboneliği zincirleme sildiği için, panelden aynı müşteri altına eklenmiş ikinci bir site tek bir WiseCP hizmetinin sonlandırılmasıyla birlikte yok olurdu. **Sayım çözülemezse "boş değil" sayılır** ve müşteri bırakılır. Müşteri silinmeden hemen önce `external_id` bir kez daha doğrulanır.
 
 ### 5.5 Paket değiştirme
 
-`apply_updowngrade()` ürünün `module_data`'sından yeni paketi okur, `change_plan()`'a delege eder.
+`apply_updowngrade()` yeni paketi **ürünün `module_data`'sından** okur ve `change_plan()`'a delege eder.
+
+Kaynak seçimi kritiktir: çekirdek bu çağrıyı **eski** sipariş seçenekleriyle yapar (`$orderopt = $order["options"]`, `coremio/helpers/orders.php:3061-3076`) ve `options.creation_info`'yu yeni ürüne göre ancak modül **döndükten sonra** tazeler (`orders.php:254-255`). Dolayısıyla `creation_info` yükseltme anında hâlâ **eski** paketi taşır; oradan okumak her yükseltmede eski paketi yeniden uygular, panel "tamam" der, çekirdek yükseltmeyi başarılı sayar ve yeni fiyatı faturalar. Ürün tarafı boşsa `creation_info`'ya düşülür; **iki taraf da boşsa işlem başarılı sayılmaz**, hata döndürülür — aksi hâlde `change_plan('')`'ın masum `true`'su, hiçbir şey değiştirmeden başarı raporlayan bir yükseltmeye dönüşür.
 
 - **cPanel:** `changepackage`. Başarısız olan override'lar (kota, trafik) dizi olarak toplanır ve hata mesajında raporlanır, sessizce yutulmaz.
 - **Plesk:** `webspace.change_plan`, plan adı önce GUID'e çevrilir.
@@ -364,10 +376,27 @@ Müşteri servis sayfasını açar → `getBandwidth()` ve `getDisk()` çağrıl
 - **Müşteri:** `use_clientArea_SingleSignOn()` → aktif sürücünün `createSession()` metodu → panel URL'ine yönlendirme.
   - cPanel: `create_user_session` (`service=cpaneld`), istemci IP'si geçirilir.
   - Plesk: `<session_setup>` operatörü, istemci IP'si geçirilir.
-- **Admin:** `use_adminArea_SingleSignOn()` → aynı akış, reseller hesabının paneline.
+- **Admin:** `use_adminArea_SingleSignOn()` → aynı akış, **o siparişin müşterisinin** paneline.
+
+  Bu, WHMCS'ten yanlış taşınmış bir gereksinimdi. WHMCS'te `AdminSingleSignOn` **sunucu düzeyinde** bir hook'tur ve bağlı bir hizmet yoktur, dolayısıyla reseller'ın kendi paneline açılır. WiseCP'de ise **sipariş düzeyinde** bir butondur: `Modules::hosting_use_method()` belirli bir sipariş üzerinden çağırır (`coremio/classes/Modules.php:1024`) ve WiseCP'nin kendi cPanel modülü de bu butondan müşterinin panelini açar (`coremio/modules/Servers/cPanel/cPanel.php:1157-1168`). Uygulama baştan doğruydu; yanlış olan bu belgeydi. Yanlış taşınan bu gereksinim, `createSession()` içinde hiçbir zaman erişilemeyen bir `whostmgrd` port dalı bırakmıştı; o dal kaldırıldı.
 - İstemci IP'si WiseCP'nin kendi yardımcılarından alınır; WHMCS'teki `CurrentUser::getIP()` karşılığı uygulama sırasında doğrulanacaktır.
 
 ---
+
+### 5.8 Sağlama sonrası alan adı değişikliği
+
+`update_hosting()` admin'in sipariş formundan `domain` alanını değiştirmesine izin verir ve yeni değeri `$set_options` içine katar (`coremio/controllers/admin/orders.php:4338`). Bunun bir panel karşılığı yoktur ve iki panelde sonucu farklıdır:
+
+- **cPanel:** hesap eski alan adını sunmaya devam eder, WiseCP yenisini gösterir. Kozmetik olarak yanlıştır ve panelden düzeltilebilir. **Engellenmez.**
+- **Plesk:** kimlik alan adından yeniden türetildiği için (§2.5) `pleskTargets()` yeni adı sonsuza kadar arar ve bulamaz. Askıya alma, askıdan indirme, şifre değiştirme, paket değiştirme, kullanım **ve sonlandırma** kalıcı olarak başarısız olur; abonelik modül üzerinden silinemez ve bayi kotasını yemeye devam eder. **`apply_options()` bu değişikliği reddeder** ve mesajda eski ile yeni alan adını anıp iki çıkış yolunu söyler: önce Plesk'te aboneliği yeniden adlandırmak, ya da hizmeti sonlandırıp yeniden oluşturmak.
+
+Çekirdeğin kendi modülleri bu duruma bir `modifyDomain()` çağrısıyla tepki verir; `DNAHosting_Module` böyle bir metot tanımlamaz — bir bayi hesabının Plesk'te aboneliği yeniden adlandırma yetkisi olduğu doğrulanmadı ve sessizce kabul etmek yukarıdaki kilitlenmeyi üretir.
+
+### 5.9 Alan adı normalizasyonu (IDN)
+
+Çekirdek `createAccount()` çağrısına domaini **punycode'a çevirerek** verir (`coremio/helpers/orders.php:2838-2840`: `idn_to_ascii($orderopt["domain"], 0, INTL_IDNA_VARIANT_UTS46)`) ama sonucu `$orderopt["domain"]` içine **geri yazmaz**. Yani abonelik panelde `xn--…` adıyla açılırken sonraki her işlem `options.domain`'i Unicode hâliyle okur.
+
+Bu yüzden `DNAHosting_Support::domainKey()` yalnızca kırpma ve küçük harfe çevirme yapmaz, ASCII dışı adları `idn_to_ascii()` ile **punycode'a da çevirir** (`function_exists` ile korunmuş; zaten ASCII olan adlar dokunulmadan geçer). Aksi hâlde `findWebspace()` bir IDN siparişini hiç bulamaz ve o hizmetin Plesk yaşam döngüsünün tamamı — sonlandırma dâhil — kalıcı olarak kırılır. cPanel etkilenmez; o `config.user` üzerinden çalışır.
 
 ## 6. Hata yönetimi ve loglama
 
@@ -408,7 +437,7 @@ Bu maddeler tasarımla kapatılamaz; canlı sunucuda doğrulanmaları gerekir.
 | # | Risk | Doğrulama |
 |---|---|---|
 | 1 | **Plesk askı bitmask'ı.** Bizim WHMCS modülümüz 32 (reseller askısı) kullanıyor; WiseCP'nin kendi Plesk modülü root olmayan sahip için 1 kullanıyor (`Plesk.php:1227`). **Hiçbiri canlıda doğrulanmadı** — WHMCS tarafında suspend/unsuspend hiç çalıştırılmadı. 32 ile gidiyoruz. | Bir test hesabını askıya al, panelde durumu ve sitenin gerçekten kapandığını gör, askıyı kaldır, geri döndüğünü gör |
-| 2 | `Cache::retrieve()` gerçekten veri döndürüyor mu (bkz. §2.10) | Uygulamanın ilk adımı; döndürmüyorsa `Cache` bırakılır |
+| 2 | ~~`Cache::retrieve()` gerçekten veri döndürüyor mu~~ **Kapandı — doğrulanmış olumsuz.** `Cache::retrieve()` (`coremio/classes/Cache.php:80-91`) `$timestamp === false` dalında `$type = "data"` atıyor ve fonksiyonun sonundan **hiçbir şey döndürmeden** düşüyor, yani her zaman `null` veriyor. Bu belirsiz decoder çıktısı değil: dalda `return` ifadesi yok. Modül doğru davranıyor — istek başına tam olarak bir fazladan probe, tasarlandığı gibi — ama **her `cacheWrite()` boşa giden I/O.** Birileri buna dönmek isterse: `retrieveAll()` (`Cache.php:95-108`) doğru unserialize ediyor ve `isCached($key)` üzerinden okunabilir, ancak `isCached()` **son kullanma tarihini kontrol etmiyor**, dolayısıyla çağıranın kendi TTL kontrolünü yazması gerekir. | ~~Uygulamanın ilk adımı~~ Doğrulandı |
 | 3 | ~~İstemci IP'sini almanın WiseCP'deki doğru yolu~~ **Kapandı.** `UserManager::GetIP()` (`coremio/classes/UserManager.php:388`) doğru yöntem; `DNAHosting.php::clientIp()` bunu kullanıyor ve `IP` doğrulamasından geçmeyen sonuçları eler. | ~~SSO uygulanırken doğrulanır~~ Doğrulandı |
 | 4 | `getPlans()` dönüş şeklinin ürün formunda beklenen anahtarlarla uyumu | Form render edilerek görülür |
 | 5 | Terminate, SSO ve kullanım yolları **WHMCS tarafında da hiç canlı çalıştırılmadı** | İki modül için de aynı canlı test turu gerekir |
