@@ -215,3 +215,30 @@ test('Plesk customerExternalId kayitli degilse bos dize doner', function () {
         . '<data><gen_info><login>musteri77</login></gen_info></data></result></get></customer>'));
     assertSame('', $p->customerExternalId(77));
 });
+
+test('Plesk findWebspace 1013 hatasinda null doner', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></webspace>'));
+    assertSame(null, $p->findWebspace('yok.com'));
+});
+
+test('Plesk findCustomer 11003 hatasinda firlatir', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<customer><get><result><status>error</status><errcode>11003</errcode>'
+        . '<errtext>The key is not valid for this IP</errtext></result></get></customer>'));
+    $e = assertThrows(function () use ($p) {
+        $p->findCustomer('wisecp-501');
+    }, '11003');
+    assertContains('11003', $e->getMessage());
+});
+
+test('Plesk findWebspace 11003 hatasinda firlatir', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><get><result><status>error</status><errcode>11003</errcode>'
+        . '<errtext>The key is not valid for this IP</errtext></result></get></webspace>'));
+    $e = assertThrows(function () use ($p) {
+        $p->findWebspace('ornek.com');
+    }, '11003');
+    assertContains('11003', $e->getMessage());
+});

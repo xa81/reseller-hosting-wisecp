@@ -211,6 +211,18 @@ class DNAHosting_Plesk
         return (string) $this->server['ip'];
     }
 
+    private function resultOrNull(SimpleXMLElement $packet, $path)
+    {
+        try {
+            return self::resultOf($packet, $path);
+        } catch (DNAHosting_Exception $e) {
+            if ($e->getCode() === 1013 || $e->getCode() === 1015) {
+                return null;
+            }
+            throw $e;
+        }
+    }
+
     public function findCustomer($externalId)
     {
         $packet = $this->request(
@@ -219,9 +231,8 @@ class DNAHosting_Plesk
             'customer.get'
         );
 
-        try {
-            $result = self::resultOf($packet, 'customer/get');
-        } catch (DNAHosting_Exception $e) {
+        $result = $this->resultOrNull($packet, 'customer/get');
+        if ($result === null) {
             return null;
         }
 
@@ -239,9 +250,8 @@ class DNAHosting_Plesk
             'customer.get'
         );
 
-        try {
-            $result = self::resultOf($packet, 'customer/get');
-        } catch (DNAHosting_Exception $e) {
+        $result = $this->resultOrNull($packet, 'customer/get');
+        if ($result === null) {
             return '';
         }
 
@@ -258,9 +268,8 @@ class DNAHosting_Plesk
             'webspace.get'
         );
 
-        try {
-            $result = self::resultOf($packet, 'webspace/get');
-        } catch (DNAHosting_Exception $e) {
+        $result = $this->resultOrNull($packet, 'webspace/get');
+        if ($result === null) {
             return null;
         }
 
