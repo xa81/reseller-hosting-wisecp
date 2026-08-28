@@ -23,9 +23,12 @@ test('cPanel okuma cagrisi GET, yazma cagrisi POST', function () {
     $t->push(200, '{"metadata":{"result":1},"data":{}}');
     $c->call('listaccts');
     assertSame('GET', $t->lastCall()['method']);
+    assertSame(30, $t->lastCall()['timeout']);
     $t->push(200, '{"metadata":{"result":1},"data":{}}');
     $c->call('createacct', array('username' => 'x'));
     assertSame('POST', $t->lastCall()['method']);
+    assertSame(400, $t->lastCall()['timeout']);
+    assertContains('api.version=1', $t->lastCall()['body']);
 });
 
 test('cPanel api.version=1 ekler', function () {
