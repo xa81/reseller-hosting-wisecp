@@ -1705,6 +1705,8 @@ git commit -m "feat: Plesk plan cozumleme, paylasimli IP secimi ve nesne arama"
 
 `webspace.add` gövdesi WHMCS 1.6.3.0 şablonuyla birebir aynı sırada kurulur. `ip_address` hem `gen_setup` hem `hosting/vrt_hst` altında geçer — WHMCS portunda `gen_setup` altındaki çıkarıldığında Plesk 18.0.80 `1014: Element 'ip_address' should be specified in 'gen_setup'` ile reddetti.
 
+Üretilen hesap şifresi `addSecret()` ile kaydedilir. `Http` yalnızca kendisine bildirilen dizeleri maskeler; kaydedilmeyen bir şifre modül loguna düz metin yazılır. Görev 4'ün incelemesi bu açığı cPanel sürücüsünde Critical olarak yakaladı — aynısı burada tekrarlanmıyor.
+
 Askı, durum alanını **okuyup kendi bitimizi ekleyerek** yazar. Doğrudan `status=32` yazmak, yöneticinin ayrı bir sebeple koyduğu askıyı (bit 16) sessizce kaldırırdı.
 
 **Files:**
@@ -1871,6 +1873,10 @@ Beklenen: `Call to undefined method DNAHosting_Plesk::createAccount()`
 
     public function createAccount(array $a)
     {
+        // Uretilen hesap sifresi de bir sirdir: kayit edilmezse Http onu
+        // maskelemeden loglar.
+        $this->http->addSecret($a['password']);
+
         $plan = $this->resolvePlan($a['plan']);
         $ip   = $this->firstSharedIp();
 
@@ -1968,6 +1974,8 @@ Beklenen: `Call to undefined method DNAHosting_Plesk::createAccount()`
 
     public function changePassword($customerId, $webspaceId, $password)
     {
+        $this->http->addSecret($password);
+
         $packet = $this->request(
             '<customer><set><filter><id>' . (int) $customerId . '</id></filter>'
             . '<values><gen_info><passwd>' . self::esc($password) . '</passwd></gen_info></values>'
