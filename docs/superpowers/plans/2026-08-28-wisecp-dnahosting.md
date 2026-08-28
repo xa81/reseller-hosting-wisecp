@@ -1796,7 +1796,7 @@ test('Plesk unsuspend yalnizca 32 bitini kaldirir', function () {
 test('Plesk terminate external-id tutmuyorsa reddeder', function () {
     list($p, $t) = dna_plesk();
     $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
-        . '<data><gen_info><login>m</login><external-id>baska-sistem-9</external-id></gen_info>'
+        . '<data><gen_info><login>m</login><external-id>baska-sistem-9</external-id></gen_info></data>'
         . '</result></get></customer>'));
     $e = assertThrows(function () use ($p) {
         $p->terminate(77, 'wisecp-501');
@@ -1808,7 +1808,7 @@ test('Plesk terminate external-id tutmuyorsa reddeder', function () {
 test('Plesk terminate external-id tutuyorsa siler', function () {
     list($p, $t) = dna_plesk();
     $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
-        . '<data><gen_info><login>m</login><external-id>wisecp-501</external-id></gen_info>'
+        . '<data><gen_info><login>m</login><external-id>wisecp-501</external-id></gen_info></data>'
         . '</result></get></customer>'));
     $t->push(200, dna_packet('<customer><del><result><status>ok</status></result></del></customer>'));
     assertTrue($p->terminate(77, 'wisecp-501'));
