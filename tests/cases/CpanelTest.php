@@ -303,6 +303,34 @@ test('cPanel redaksiyonu yalnizca oturum cagrisina bakar, diger yanitlar okunur 
     assertContains('"user":"ornek1"', implode("\n", $lines));
 });
 
+test('cPanel ayristirma hatasi mesaji oturum jetonunu sizdirmaz', function () {
+    // Bu mesaj openPanel() ile MUSTERININ TARAYICISINA basiliyor. summarise()
+    // static oldugu icin ne yanit redaksiyonunu ne de sir maskesini biliyordu.
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '<b>Proxy hatasi</b> redirect=https://1.2.3.4:2083/cpsess7654321/login/');
+    $e = assertThrows(function () use ($c) {
+        $c->createSession('ornek1');
+    }, 'gecerli JSON dondurmedi');
+    assertSame(false, strpos($e->getMessage(), 'cpsess7654321'), 'jeton hata mesajinda olmamali');
+});
+
+test('cPanel ayristirma hatasi mesaji sunucu jetonunu da maskeler', function () {
+    // static summarise() sir maskesini de atliyordu.
+    list($c, $t) = dna_cpanel();
+    $t->push(200, 'yetkilendirme reddedildi: TOKEN123456');
+    $e = assertThrows(function () use ($c) {
+        $c->call('listaccts');
+    }, 'gecerli JSON dondurmedi');
+    assertSame(false, strpos($e->getMessage(), 'TOKEN123456'), 'sunucu jetonu mesajda olmamali');
+});
+
+test('cPanel ayristirma hatasi mesaji teshis metnini korur', function () {
+    // Fazla redaksiyon da hatadir: "HTTP 502" tek basina teshis edilemez.
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '<b>502 Bad Gateway</b>');
+    assertThrows(function () use ($c) { $c->call('listaccts'); }, '502 Bad Gateway');
+});
+
 test('cPanel createSession goreli URLyi mutlaklastirir', function () {
     list($c, $t) = dna_cpanel();
     $t->push(200, '{"metadata":{"result":1},"data":{"url":"/cpsess123/"}}');

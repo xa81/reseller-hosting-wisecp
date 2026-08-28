@@ -654,3 +654,46 @@ test('Plesk redaksiyonu yalnizca oturum cagrisina bakar, diger id alanlari okunu
     $p->request('<webspace><get/></webspace>', 'webspace.get');
     assertContains('<id>4242</id>', implode("\n", $lines));
 });
+
+test('Plesk ayristirma hatasi mesaji oturum kimligini sizdirmaz', function () {
+    // Bu mesaj openPanel() ile MUSTERININ TARAYICISINA basiliyor.
+    list($p, $t) = dna_plesk();
+    $t->push(200, '<html>Gateway hatasi PLESKSESSID=PLESKCANLI99887766 </html>');
+    $e = assertThrows(function () use ($p) {
+        $p->createSession('ornek1', '9.9.9.9');
+    }, 'gecerli XML dondurmedi');
+    assertSame(false, strpos($e->getMessage(), 'PLESKCANLI99887766'), 'kimlik mesajda olmamali');
+});
+
+test('Plesk bozuk yanitta PLESKSESSID logda da redakte edilir', function () {
+    // <id> deseni yalnizca duzgun XMLde tutar; bozuk govdede log korumasiz kaliyordu.
+    list($p, $t, $h) = dna_plesk();
+    $lines = array();
+    $h->setLogger(function ($action, $request, $response) use (&$lines) {
+        $lines[] = $response;
+    });
+    $t->push(200, '<html>Gateway hatasi PLESKSESSID=PLESKCANLI99887766 </html>');
+    try {
+        $p->createSession('ornek1', '9.9.9.9');
+    } catch (Exception $e) {
+        // beklenen: ayristirma hatasi
+    }
+    assertSame(false, strpos(implode("\n", $lines), 'PLESKCANLI99887766'), 'log da redakte edilmeli');
+});
+
+test('Plesk ayristirma hatasi mesaji anahtar sirrini maskeler', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, '<html>ANAHTAR-1234-5678 reddedildi</html>');
+    $e = assertThrows(function () use ($p) {
+        $p->request('<server><get/></server>', 'server.get');
+    }, 'gecerli XML dondurmedi');
+    assertSame(false, strpos($e->getMessage(), 'ANAHTAR-1234-5678'), 'anahtar mesajda olmamali');
+});
+
+test('Plesk ayristirma hatasi mesaji teshis metnini korur', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, '<html>502 Bad Gateway</html>');
+    assertThrows(function () use ($p) {
+        $p->request('<server><get/></server>', 'server.get');
+    }, '502 Bad Gateway');
+});

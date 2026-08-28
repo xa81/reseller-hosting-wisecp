@@ -411,6 +411,8 @@ Bu yüzden `DNAHosting_Support::domainKey()` yalnızca kırpma ve küçük harfe
 
 Redaksiyonun kapsamı bilerek **eylem adıdır**, tek atımlık bir bayrak değil: Plesk `request()` kimlik hatasında ikinci bir istek atar ve tek atımlık bir bayrak orada tükenip asıl yanıtı maskesiz bırakırdı. Redaksiyon yalnızca **log ve hata kopyasına** uygulanır — çağırana ham gövde döner — ve gövdenin tamamını değil yalnızca kimlik alanlarını gizler, böylece aşağıdaki teşhis kalitesi şartı korunur.
 
+Log tek çıkış yolu **değildir**: ayrıştırma hatası yolunda ("sunucu geçerli JSON/XML döndürmedi") sürücüler hata mesajını gövdeden kurar ve o mesaj `$this->error` üzerinden `openPanel()` ile **müşterinin tarayıcısına** basılır. Static `summarise()` ne redaksiyonu ne sır maskesini bildiği için bu yol ikisini de baypas ediyordu; `safeSummary()` bunu kapatır.
+
 **Hata mesajı kalitesi** — WHMCS portunda öğrenilen dersler doğrudan taşınır:
 
 - HTTP >= 400'de gövde **mutlaka** özetlenir; "HTTP 403" tek başına teşhis edilemez.

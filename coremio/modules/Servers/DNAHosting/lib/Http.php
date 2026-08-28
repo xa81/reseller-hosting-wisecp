@@ -98,6 +98,20 @@ class DNAHosting_Http
         return $body;
     }
 
+    /**
+     * Bir yanit govdesinden KULLANICIYA gosterilmeye uygun ozet.
+     *
+     * summarise() staticdir: ne yanit redaksiyonunu ne de sir maskesini bilir.
+     * Surucler ayristirma hatasi yolunda ("gecerli JSON/XML dondurmedi") hata
+     * mesajini ham govdeden kuruyordu; o mesaj $this->error uzerinden admin
+     * arayuzune ve openPanel() ile MUSTERININ TARAYICISINA kadar gidiyor.
+     * Ozet artik once redakte, sonra maskelenmis metinden cikarilir.
+     */
+    public function safeSummary($action, $body, $limit = 300)
+    {
+        return self::summarise($this->mask($this->redactResponse($action, (string) $body)), $limit);
+    }
+
     public function send($method, $path, array $headers, $body, $action)
     {
         $url       = $this->base . $path;

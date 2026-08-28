@@ -22,8 +22,12 @@ class DNAHosting_Plesk
         // loglandiktan sonra addSecret'e verebiliriz. Desen burada, deger
         // bilinmeden once kaydedilir. Kapsam bu eylemle sinirli oldugu icin
         // diger cagrilarin <id> alanlari (webspace, customer) okunur kalir.
+        // Ikinci desen bilerek gövde seklinden BAGIMSIZ: <id> yalnizca duzgun XMLde
+        // tutar, oysa bir vekil sunucu/gateway hata sayfasi oturum kimligini
+        // PLESKSESSID=... biciminde geri yansitabilir ve o govde hic ayristirilamaz.
         $this->http->addResponseRedaction('server.create_session', array(
-            '/(<id>)[^<]*(<\/id>)/' => '$1***$2',
+            '/(<id>)[^<]*(<\/id>)/'        => '$1***$2',
+            '/(PLESKSESSID=)[^&"\'\s<]+/i' => '$1***',
         ));
     }
 
@@ -80,7 +84,8 @@ class DNAHosting_Plesk
 
         if ($packet === false || $packet->getName() !== 'packet') {
             throw new DNAHosting_Exception(
-                $action . ': sunucu gecerli XML dondurmedi. ' . DNAHosting_Http::summarise($response['body'])
+                $action . ': sunucu gecerli XML dondurmedi. '
+                . $this->http->safeSummary($action, $response['body'])
             );
         }
 

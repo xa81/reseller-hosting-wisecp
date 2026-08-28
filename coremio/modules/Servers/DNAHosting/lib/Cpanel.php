@@ -54,7 +54,7 @@ class DNAHosting_Cpanel
         if (!is_array($decoded)) {
             throw new DNAHosting_Exception(
                 $function . ': sunucu gecerli JSON dondurmedi. '
-                . DNAHosting_Http::summarise($body)
+                . $this->http->safeSummary($function, $body)
             );
         }
 
