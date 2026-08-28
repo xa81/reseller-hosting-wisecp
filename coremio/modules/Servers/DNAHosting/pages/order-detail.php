@@ -12,7 +12,7 @@
      * config[user] ve config[password] girdileri ZORUNLUDUR: admin sablonu bu iki alani
      * ada gore ariyor (templates/admin/hosting-order-detail.php:1365, 1464, 1467, 1494)
      * ve update_hosting() onlari Filter::POST("config") ile geri okuyor. Girdiler yoksa
-     * Filter::POST false doner, cekirdegin budama koruması (orders.php:4353) false'u
+     * Filter::POST false doner, cekirdegin budama korumasi (orders.php:4353) false'u
      * atlar ve options uzerine "config":false yazilir — options.config.user kaybolur.
      * Butun yasam dongusu dallari o anahtara bagli oldugundan (orders.php:2880, 2951,
      * 2997) hizmetin askiya alinmasi, sonlandirilmasi, sifresinin degistirilmesi, SSO'su
@@ -31,7 +31,7 @@
     // Sifre veritabaninda kodlanmis durur ve get_order() onu cozmeden birakir
     // (coremio/controllers/admin/orders.php:583); forma cozulmus haliyle cizilir.
     $pass = '';
-    if (isset($config["password"]) && $config["password"] !== ''
+    if (isset($config["password"]) && is_string($config["password"]) && $config["password"] !== ''
         && class_exists("Crypt") && class_exists("Config")) {
         $decoded = Crypt::decode($config["password"], Config::get("crypt/user"));
         $pass    = is_string($decoded) ? $decoded : '';
