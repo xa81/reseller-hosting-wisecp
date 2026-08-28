@@ -95,3 +95,95 @@ test('cPanel resolvePackage bulunamayinca mevcutlari listeler', function () {
     $e = assertThrows(function () use ($c) { $c->resolvePackage('yok'); }, 'yok');
     assertContains('bayi_pro', $e->getMessage(), 'hata mesaji mevcut paketleri gostermeli');
 });
+
+test('cPanel createAccount kimlik bilgilerini dondurur', function () {
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"pkg":[{"name":"bayi_pro","QUOTA":"1","BWLIMIT":"1"}]}}');
+    $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    $r = $c->createAccount(array(
+        'username' => 'ornek1', 'password' => 'Gizli.123!',
+        'domain' => 'ornek.com', 'plan' => 'pro', 'email' => 'a@b.c',
+    ));
+    assertSame('ornek1', $r['username']);
+    assertSame('Gizli.123!', $r['password']);
+    $call = $t->lastCall();
+    assertSame('POST', $call['method']);
+    assertContains('createacct', $call['url']);
+    assertContains('plan=bayi_pro', $call['body']);
+});
+
+test('cPanel createAccount zaman asiminda accountsummary ile kurtarir', function () {
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"pkg":[{"name":"bayi_pro","QUOTA":"1","BWLIMIT":"1"}]}}');
+    $t->pushError('Operation timed out after 400000 milliseconds');
+    $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1","domain":"ornek.com"}]}}');
+    $r = $c->createAccount(array(
+        'username' => 'ornek1', 'password' => 'Gizli.123!',
+        'domain' => 'ornek.com', 'plan' => 'pro', 'email' => 'a@b.c',
+    ));
+    assertSame('ornek1', $r['username']);
+});
+
+test('cPanel createAccount kurtarma domaini tutmuyorsa hatayi verir', function () {
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"pkg":[{"name":"bayi_pro","QUOTA":"1","BWLIMIT":"1"}]}}');
+    $t->pushError('Operation timed out');
+    $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1","domain":"baska.com"}]}}');
+    assertThrows(function () use ($c) {
+        $c->createAccount(array(
+            'username' => 'ornek1', 'password' => 'Gizli.123!',
+            'domain' => 'ornek.com', 'plan' => 'pro', 'email' => 'a@b.c',
+        ));
+    }, 'Operation timed out');
+});
+
+test('cPanel suspend/unsuspend/terminate dogru fonksiyonu cagirir', function () {
+    list($c, $t) = dna_cpanel();
+    $ok = '{"metadata":{"result":1},"data":{}}';
+    $t->push(200, $ok); assertTrue($c->suspendAccount('ornek1', 'Odeme yok'));
+    assertContains('suspendacct', $t->lastCall()['url']);
+    assertContains('reason=Odeme+yok', $t->lastCall()['body']);
+    $t->push(200, $ok); assertTrue($c->unsuspendAccount('ornek1'));
+    assertContains('unsuspendacct', $t->lastCall()['url']);
+    $t->push(200, $ok); assertTrue($c->terminateAccount('ornek1'));
+    assertContains('removeacct', $t->lastCall()['url']);
+});
+
+test('cPanel changePackage plani cozer', function () {
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"pkg":[{"name":"bayi_kurumsal","QUOTA":"1","BWLIMIT":"1"}]}}');
+    $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    assertTrue($c->changePackage('ornek1', 'kurumsal'));
+    assertContains('pkg=bayi_kurumsal', $t->lastCall()['body']);
+});
+
+test('cPanel accountSummary hesap yoksa null doner', function () {
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":0,"reason":"account does not exist"}}');
+    assertSame(null, $c->accountSummary('yokboyle'));
+});
+
+test('cPanel usage MByi bayta cevirir, unlimited sifir olur', function () {
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1",'
+        . '"diskused":"512M","disklimit":"2048M","totalbytes":"1048576","limit":"unlimited"}]}}');
+    $u = $c->usage('ornek1');
+    assertSame(512 * 1024 * 1024, $u['disk_used']);
+    assertSame(2048 * 1024 * 1024, $u['disk_limit']);
+    assertSame(1048576, $u['bw_used']);
+    assertSame(0, $u['bw_limit']);
+});
+
+test('cPanel createSession tam URL dondurur', function () {
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"url":"https://1.2.3.4:2083/cpsess123/"}}');
+    $url = $c->createSession('ornek1', 'cpaneld', '9.9.9.9');
+    assertSame('https://1.2.3.4:2083/cpsess123/', $url);
+    assertContains('create_user_session', $t->lastCall()['url']);
+});
+
+test('cPanel createSession goreli URLyi mutlaklastirir', function () {
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"url":"/cpsess123/"}}');
+    assertSame('https://1.2.3.4:2083/cpsess123/', $c->createSession('ornek1'));
+});

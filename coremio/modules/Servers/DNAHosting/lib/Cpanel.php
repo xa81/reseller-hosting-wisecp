@@ -127,4 +127,129 @@ class DNAHosting_Cpanel
             . ($names ? implode(', ', $names) : '(hic paket yok)')
         );
     }
+
+    public function createAccount(array $a)
+    {
+        $plan = $this->resolvePackage($a['plan']);
+
+        $args = array(
+            'username'    => $a['username'],
+            'domain'      => $a['domain'],
+            'password'    => $a['password'],
+            'plan'        => $plan,
+            'contactemail' => isset($a['email']) ? $a['email'] : '',
+        );
+
+        try {
+            $this->call('createacct', $args);
+        } catch (DNAHosting_Exception $e) {
+            $summary = $this->accountSummary($a['username']);
+            if ($summary && isset($summary['domain'])
+                && strcasecmp($summary['domain'], $a['domain']) === 0) {
+                // Hesap aslinda acilmis, yalnizca yanit gecikmis.
+                return array('username' => $a['username'], 'password' => $a['password']);
+            }
+            throw $e;
+        }
+
+        return array('username' => $a['username'], 'password' => $a['password']);
+    }
+
+    public function accountSummary($username)
+    {
+        try {
+            $data = $this->call('accountsummary', array('user' => $username));
+        } catch (DNAHosting_Exception $e) {
+            return null;
+        }
+        if (isset($data['acct'][0])) {
+            return $data['acct'][0];
+        }
+        return null;
+    }
+
+    public function suspendAccount($username, $reason = '')
+    {
+        $this->call('suspendacct', array('user' => $username, 'reason' => $reason));
+        return true;
+    }
+
+    public function unsuspendAccount($username)
+    {
+        $this->call('unsuspendacct', array('user' => $username));
+        return true;
+    }
+
+    public function terminateAccount($username)
+    {
+        $this->call('removeacct', array('user' => $username, 'keepdns' => 0));
+        return true;
+    }
+
+    public function changePassword($username, $password)
+    {
+        $this->call('passwd', array('user' => $username, 'password' => $password));
+        return true;
+    }
+
+    public function changePackage($username, $plan)
+    {
+        $this->call('changepackage', array('user' => $username, 'pkg' => $this->resolvePackage($plan)));
+        return true;
+    }
+
+    public function usage($username)
+    {
+        $summary = $this->accountSummary($username);
+        if (!$summary) {
+            throw new DNAHosting_Exception('"' . $username . '" hesabi sunucuda bulunamadi.');
+        }
+
+        return array(
+            'disk_used'  => self::toBytes(isset($summary['diskused']) ? $summary['diskused'] : 0),
+            'disk_limit' => self::toBytes(isset($summary['disklimit']) ? $summary['disklimit'] : 0),
+            'bw_used'    => self::toBytes(isset($summary['totalbytes']) ? $summary['totalbytes'] : 0, 1),
+            'bw_limit'   => self::toBytes(isset($summary['limit']) ? $summary['limit'] : 0, 1),
+        );
+    }
+
+    /**
+     * cPanel disk degerlerini "512M" gibi son ekle, trafigi ise cift bayt olarak verir.
+     * $bareIsBytes=1 ise son eksiz sayilar bayt, degilse megabayt sayilir.
+     */
+    public static function toBytes($value, $bareIsBytes = 0)
+    {
+        $value = trim((string) $value);
+        if ($value === '' || strcasecmp($value, 'unlimited') === 0) {
+            return 0;
+        }
+        $unit   = strtoupper(substr($value, -1));
+        $number = (float) $value;
+        $scales = array('K' => 1024, 'M' => 1048576, 'G' => 1073741824, 'T' => 1099511627776);
+        if (isset($scales[$unit])) {
+            return (int) round($number * $scales[$unit]);
+        }
+        return (int) round($number * ($bareIsBytes ? 1 : 1048576));
+    }
+
+    public function createSession($username, $service = 'cpaneld', $clientIp = '')
+    {
+        $args = array('user' => $username, 'service' => $service);
+        if ($clientIp !== '') {
+            $args['locale'] = '';
+            $args['client_ip'] = $clientIp;
+        }
+        $data = $this->call('create_user_session', $args);
+        if (empty($data['url'])) {
+            throw new DNAHosting_Exception('Sunucu oturum baglantisi dondurmedi.');
+        }
+
+        $url = (string) $data['url'];
+        if (strpos($url, 'http') !== 0) {
+            $scheme = $this->server['secure'] ? 'https' : 'http';
+            $port   = $service === 'whostmgrd' ? 2087 : 2083;
+            $url    = $scheme . '://' . $this->server['ip'] . ':' . $port . $url;
+        }
+        return $url;
+    }
 }
