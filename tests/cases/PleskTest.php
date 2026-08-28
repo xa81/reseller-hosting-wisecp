@@ -56,6 +56,7 @@ test('Plesk basic auth da basarisizsa anlamli hata verir', function () {
     assertThrows(function () use ($p) {
         $p->request('<server><get><gen_info/></get></server>', 'test');
     }, 'Authentication failed');
+    assertSame(2, count($t->calls));
 });
 
 test('Plesk 11003 hatasini IP aciklamasina cevirir', function () {
@@ -99,4 +100,39 @@ test('Plesk testConnection true doner', function () {
     list($p, $t) = dna_plesk();
     $t->push(200, dna_packet('<server><get><result><status>ok</status></result></get></server>'));
     assertTrue($p->testConnection());
+});
+
+test('Plesk setAuthMode basic ile KEY probasini atlar', function () {
+    list($p, $t) = dna_plesk();
+    $p->setAuthMode('basic');
+    $t->push(200, dna_packet('<server><get><result><status>ok</status></result></get></server>'));
+    $p->request('<server><get><gen_info/></get></server>', 'test');
+    $headers = $t->lastCall()['headers'];
+    assertTrue(in_array('HTTP_AUTH_LOGIN: bayi', $headers));
+    assertTrue(in_array('HTTP_AUTH_PASSWD: ANAHTAR-1234-5678', $headers));
+    assertSame(1, count($t->calls));
+});
+
+test('Plesk dovusken dugmede mode kilitlenir', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<system><status>error</status><errcode>1001</errcode>'
+        . '<errtext>Authentication failed</errtext></system>'));
+    $t->push(200, dna_packet('<server><get><result><status>ok</status></result></get></server>'));
+    $p->request('<server><get><gen_info/></get></server>', 'test');
+    assertSame('basic', $p->authMode());
+    $t->push(200, dna_packet('<server><get><result><status>ok</status></result></get></server>'));
+    $p->request('<server><get><gen_info/></get></server>', 'test');
+    $headers = $t->lastCall()['headers'];
+    assertTrue(in_array('HTTP_AUTH_LOGIN: bayi', $headers));
+    assertSame(3, count($t->calls));
+});
+
+test('Plesk dusus hatasini ayirt eder', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<system><status>error</status><errcode>1015</errcode>'
+        . '<errtext>Permission denied or object not found</errtext></system>'));
+    assertThrows(function () use ($p) {
+        $p->request('<server><get><gen_info/></get></server>', 'test');
+    }, '1015');
+    assertSame(1, count($t->calls));
 });

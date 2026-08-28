@@ -39,7 +39,7 @@ class DNAHosting_Plesk
         } catch (DNAHosting_Exception $e) {
             $canFallBack = !$this->authSettled
                 && $this->authMode === 'key'
-                && $this->isAuthFailure($e->getMessage());
+                && $this->isAuthFailure($e);
             if (!$canFallBack) {
                 throw $e;
             }
@@ -76,10 +76,8 @@ class DNAHosting_Plesk
         }
 
         if (isset($packet->system->status) && (string) $packet->system->status === 'error') {
-            throw new DNAHosting_Exception(self::describe(
-                (string) $packet->system->errcode,
-                (string) $packet->system->errtext
-            ));
+            $code = (string) $packet->system->errcode;
+            throw new DNAHosting_Exception(self::describe($code, (string) $packet->system->errtext), (int) $code);
         }
 
         if ($mode === 'key') {
@@ -103,10 +101,8 @@ class DNAHosting_Plesk
 
         $result = $node->result;
         if ((string) $result->status === 'error') {
-            throw new DNAHosting_Exception(self::describe(
-                (string) $result->errcode,
-                (string) $result->errtext
-            ));
+            $code = (string) $result->errcode;
+            throw new DNAHosting_Exception(self::describe($code, (string) $result->errtext), (int) $code);
         }
         return $result;
     }
@@ -126,11 +122,16 @@ class DNAHosting_Plesk
         return 'Plesk (' . ($code !== '' ? $code : '?') . '): ' . $text . $hint;
     }
 
-    private function isAuthFailure($message)
+    private function isAuthFailure(DNAHosting_Exception $e)
     {
-        return stripos($message, 'Authentication failed') !== false
-            || stripos($message, 'Permission denied') !== false
-            || strpos($message, '(1001)') !== false;
+        if ($e->getCode() === 1001) {
+            return true;
+        }
+        // Narrow fallback for malformed errors with no code: accept text match only if code is 0
+        if ($e->getCode() === 0 && stripos($e->getMessage(), 'Authentication failed') !== false) {
+            return true;
+        }
+        return false;
     }
 
     public function testConnection()
