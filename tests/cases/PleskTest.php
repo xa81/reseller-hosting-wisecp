@@ -8,7 +8,7 @@ function dna_plesk()
     $http = new DNAHosting_Http('https://5.6.7.8:8443');
     $t    = new DNAHosting_FakeTransport();
     $http->setTransport($t);
-    return array(new DNAHosting_Plesk($server, $http), $t);
+    return array(new DNAHosting_Plesk($server, $http), $t, $http);
 }
 
 function dna_packet($inner)
@@ -583,4 +583,13 @@ test('Plesk createSession oturum URLsi kurar', function () {
     $url = $p->createSession('ornek1', '9.9.9.9');
     assertSame('https://5.6.7.8:8443/enterprise/rsession_init.php?PLESKSESSID=SESS123', $url);
     assertContains('<user_ip>9.9.9.9</user_ip>', $t->lastCall()['body']);
+});
+
+test('Plesk createSession oturum kimligini sir olarak kaydeder', function () {
+    // PLESKSESSID canli bir kimlik bilgisidir; loga duz yazilmamalidir.
+    list($p, $t, $h) = dna_plesk();
+    $t->push(200, dna_packet('<server><create_session><result><status>ok</status>'
+        . '<id>SESS1234567</id></result></create_session></server>'));
+    $p->createSession('ornek1', '9.9.9.9');
+    assertSame('PLESKSESSID=***', $h->mask('PLESKSESSID=SESS1234567'));
 });

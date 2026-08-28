@@ -607,6 +607,10 @@ class DNAHosting_Plesk
             throw new DNAHosting_Exception('Plesk oturum kimligi dondurmedi.');
         }
 
+        // PLESKSESSID canli bir kimlik bilgisidir; sir olarak kaydedilirse sonraki her
+        // log satirinda maskelenir.
+        $this->http->addSecret($sessionId);
+
         return ($this->server['secure'] ? 'https' : 'http') . '://'
             . $this->server['ip'] . ':' . $this->server['port']
             . '/enterprise/rsession_init.php?PLESKSESSID=' . rawurlencode($sessionId);

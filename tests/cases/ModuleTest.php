@@ -465,7 +465,9 @@ test('Modul getDisk WiseCP sozlesmesine uyar', function () {
     list($m, $t) = dna_module_n(2087, function ($t) {
         $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
         $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1",'
-            . '"diskused":"512M","disklimit":"1024M","totalbytes":"1048576","limit":"unlimited"}]}}');
+            . '"diskused":"512M","disklimit":"1024M"}]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{"bandwidth":[{"acct":[{"user":"ornek1",'
+            . '"totalbytes":"1048576","limit":"unlimited"}]}]}}');
     });
     $m->config['user'] = 'ornek1';
     $d = $m->getDisk();
@@ -480,7 +482,9 @@ test('Modul getBandwidth sinirsizi sonsuz gosterir', function () {
     list($m, $t) = dna_module_n(2087, function ($t) {
         $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
         $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1",'
-            . '"diskused":"512M","disklimit":"1024M","totalbytes":"1048576","limit":"unlimited"}]}}');
+            . '"diskused":"512M","disklimit":"1024M"}]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{"bandwidth":[{"acct":[{"user":"ornek1",'
+            . '"totalbytes":"1048576","limit":"unlimited"}]}]}}');
     });
     $m->config['user'] = 'ornek1';
     $b = $m->getBandwidth();
@@ -493,12 +497,14 @@ test('Modul kullanim verisini tek istekte bir kez ceker', function () {
     list($m, $t) = dna_module_n(2087, function ($t) {
         $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
         $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1",'
-            . '"diskused":"512M","disklimit":"1024M","totalbytes":"1","limit":"1"}]}}');
+            . '"diskused":"512M","disklimit":"1024M"}]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{"bandwidth":[{"acct":[{"user":"ornek1",'
+            . '"totalbytes":"1","limit":"1"}]}]}}');
     });
     $m->config['user'] = 'ornek1';
     $m->getDisk();
     $m->getBandwidth();
-    assertSame(2, count($t->calls), 'tespit + tek kullanim cagrisi bekleniyor');
+    assertSame(3, count($t->calls), 'tespit + accountsummary + showbw; ikinci tur olmamali');
 });
 
 test('Modul getDisk hatada false doner', function () {

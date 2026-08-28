@@ -208,6 +208,7 @@ class DNAHosting_Cpanel
         return true;
     }
 
+    /** Disk accountsummary'den, trafik showbw'den — bkz. bandwidth(). */
     public function usage($username)
     {
         $summary = $this->accountSummary($username);
@@ -215,12 +216,61 @@ class DNAHosting_Cpanel
             throw new DNAHosting_Exception('"' . $username . '" hesabi sunucuda bulunamadi.');
         }
 
+        $bandwidth = $this->bandwidth($username);
+
         return array(
             'disk_used'  => self::toBytes(isset($summary['diskused']) ? $summary['diskused'] : 0),
             'disk_limit' => self::toBytes(isset($summary['disklimit']) ? $summary['disklimit'] : 0),
-            'bw_used'    => self::toBytes(isset($summary['totalbytes']) ? $summary['totalbytes'] : 0, 1),
-            'bw_limit'   => self::toBytes(isset($summary['limit']) ? $summary['limit'] : 0, 1),
+            'bw_used'    => $bandwidth['used'],
+            'bw_limit'   => $bandwidth['limit'],
         );
+    }
+
+    /**
+     * Bir hesabin bu ayki trafigi ve trafik siniri, BAYT olarak.
+     *
+     * Kaynak bilerek showbw: sinirin bayt olarak bildirildigi tek yer orasidir.
+     * listaccts'te de bir bwlimit var ama BASKA bir birimde; ikisini karistirmak
+     * siniri yaklasik 10^6 katsayisiyla yanlis gosterir ve her musteriyi %100 dolu
+     * olarak raporlar. accountsummary'nin totalbytes/limit alanlari ise cogu surumde
+     * hic bulunmaz — o zaman da trafik sessizce "0 / sonsuz" cikar. Iki hata da
+     * sessiz oldugu icin kaynak tek yerde sabitlenmistir.
+     *
+     * showbw argumansiz cagrilir: bayinin kendi hesaplarini dondurur ve satir
+     * kullanici adina gore burada secilir — WHMCS modulunun canlida dogrulanmis
+     * davranisi da budur.
+     */
+    public function bandwidth($username)
+    {
+        $rows = self::bandwidthRows($this->call('showbw'));
+
+        foreach ($rows as $row) {
+            if (!isset($row['user']) || strcasecmp((string) $row['user'], (string) $username) !== 0) {
+                continue;
+            }
+            return array(
+                'used'  => isset($row['totalbytes']) ? self::toBytes($row['totalbytes'], 1) : 0,
+                'limit' => isset($row['limit']) ? self::toBytes($row['limit'], 1) : 0,
+            );
+        }
+
+        // Hesap showbw ciktisinda yoksa (ornegin yeni acilmis) henuz trafik olusmamistir.
+        return array('used' => 0, 'limit' => 0);
+    }
+
+    /** showbw hesap satirlari; WHM surumleri arasinda zarf sekli degisebiliyor. */
+    private static function bandwidthRows(array $data)
+    {
+        if (isset($data['bandwidth'][0]['acct']) && is_array($data['bandwidth'][0]['acct'])) {
+            return $data['bandwidth'][0]['acct'];
+        }
+        if (isset($data['bandwidth']['acct']) && is_array($data['bandwidth']['acct'])) {
+            return $data['bandwidth']['acct'];
+        }
+        if (isset($data['acct']) && is_array($data['acct'])) {
+            return $data['acct'];
+        }
+        return array();
     }
 
     /**
@@ -242,14 +292,18 @@ class DNAHosting_Cpanel
         return (int) round($number * ($bareIsBytes ? 1 : 1048576));
     }
 
+    /**
+     * Musteri icin tek kullanimlik giris URLsi.
+     *
+     * WHM API 1'in create_user_session'i yalnizca user ve service alir. WiseCP'nin kendi
+     * cPanel modulu de (coremio/modules/Servers/cPanel/cPanel.php:1205, :1259), WHMCS'in
+     * kendi modulu de baska bir sey gondermez: client_ip diye bir arguman yoktur — WHM
+     * oturumu gordugu adrese baglar — ve bos bir locale WHM tarafindan harfiyen alinabilir.
+     * $clientIp imzada kaliyor cunku Plesk surucusu onu gercekten kullaniyor.
+     */
     public function createSession($username, $service = 'cpaneld', $clientIp = '')
     {
-        $args = array('user' => $username, 'service' => $service);
-        if ($clientIp !== '') {
-            $args['locale'] = '';
-            $args['client_ip'] = $clientIp;
-        }
-        $data = $this->call('create_user_session', $args);
+        $data = $this->call('create_user_session', array('user' => $username, 'service' => $service));
         if (empty($data['url'])) {
             throw new DNAHosting_Exception('Sunucu oturum baglantisi dondurmedi.');
         }
@@ -257,9 +311,32 @@ class DNAHosting_Cpanel
         $url = (string) $data['url'];
         if (strpos($url, 'http') !== 0) {
             $scheme = $this->server['secure'] ? 'https' : 'http';
-            $port   = $service === 'whostmgrd' ? 2087 : 2083;
-            $url    = $scheme . '://' . $this->server['ip'] . ':' . $port . $url;
+            $url    = $scheme . '://' . $this->server['ip'] . ':2083' . $url;
         }
+
+        // WHM her zaman SSL portunda bir https URLsi uretir. secure=0 bir sunucuda sema
+        // ve port BIRLIKTE indirilmelidir; yalnizca semayi degistirmek http://host:2083
+        // verir ve orada dinleyen bir sey yoktur.
+        if (empty($this->server['secure'])) {
+            $url = str_replace(
+                array('https:', ':2087', ':2083', ':2096'),
+                array('http:', ':2086', ':2082', ':2095'),
+                $url
+            );
+        }
+
+        // URL bir tarayiciya veriliyor: duz http(s) olmayan hicbir seyi kabul etme —
+        // baska bir seyle yanit veren bir panel, musteriyi gonderecegimiz yer degildir.
+        $parts = parse_url($url);
+        if (!is_array($parts) || empty($parts['host']) || !isset($parts['scheme'])
+            || !in_array(strtolower($parts['scheme']), array('http', 'https'), true)) {
+            throw new DNAHosting_Exception('Sunucu kullanilamaz bir oturum baglantisi dondurdu.');
+        }
+
+        // cpsess... jetonu ayri bir alanda degil, yolun icinde gelir: URLnin kendisi canli
+        // bir kimlik bilgisidir. Sir olarak kaydedilirse sonraki her log satirinda maskelenir.
+        $this->http->addSecret($url);
+
         return $url;
     }
 }

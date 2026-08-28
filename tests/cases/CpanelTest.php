@@ -8,7 +8,7 @@ function dna_cpanel($secure = 1)
     $http = new DNAHosting_Http(($secure ? 'https' : 'http') . '://1.2.3.4:2087');
     $t    = new DNAHosting_FakeTransport();
     $http->setTransport($t);
-    return array(new DNAHosting_Cpanel($server, $http), $t);
+    return array(new DNAHosting_Cpanel($server, $http), $t, $http);
 }
 
 test('cPanel WHM token basligi gonderir', function () {
@@ -145,8 +145,11 @@ test('cPanel suspend/unsuspend/terminate dogru fonksiyonu cagirir', function () 
     assertContains('reason=Odeme+yok', $t->lastCall()['body']);
     $t->push(200, $ok); assertTrue($c->unsuspendAccount('ornek1'));
     assertContains('unsuspendacct', $t->lastCall()['url']);
+    assertContains('user=ornek1', $t->lastCall()['body']);
     $t->push(200, $ok); assertTrue($c->terminateAccount('ornek1'));
     assertContains('removeacct', $t->lastCall()['url']);
+    assertContains('user=ornek1', $t->lastCall()['body']);
+    assertContains('keepdns=0', $t->lastCall()['body'], 'keepdns dusulurse DNS bolgesi geride kalir');
 });
 
 test('cPanel changePackage plani cozer', function () {
@@ -166,11 +169,51 @@ test('cPanel accountSummary hesap yoksa null doner', function () {
 test('cPanel usage MByi bayta cevirir, unlimited sifir olur', function () {
     list($c, $t) = dna_cpanel();
     $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1",'
-        . '"diskused":"512M","disklimit":"2048M","totalbytes":"1048576","limit":"unlimited"}]}}');
+        . '"diskused":"512M","disklimit":"2048M"}]}}');
+    $t->push(200, '{"metadata":{"result":1},"data":{"bandwidth":[{"acct":[{"user":"ornek1",'
+        . '"totalbytes":"1048576","limit":"unlimited"}]}]}}');
     $u = $c->usage('ornek1');
     assertSame(512 * 1024 * 1024, $u['disk_used']);
     assertSame(2048 * 1024 * 1024, $u['disk_limit']);
     assertSame(1048576, $u['bw_used']);
+    assertSame(0, $u['bw_limit']);
+});
+
+test('cPanel usage sayisal trafik sinirini bayt olarak okur', function () {
+    // showbw, sinirin BAYT olarak bildirildigi tek yerdir. accountsummary/listaccts
+    // icindeki bwlimit baska bir birimdedir; karistirmak siniri ~10^6 katsayisiyla
+    // yanlis gosterir ve her musteriyi %100 dolu raporlar.
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1",'
+        . '"diskused":"512M","disklimit":"2048M"}]}}');
+    $t->push(200, '{"metadata":{"result":1},"data":{"bandwidth":[{"acct":[{"user":"ornek1",'
+        . '"totalbytes":"2147483648","limit":"10737418240"}]}]}}');
+    $u = $c->usage('ornek1');
+    assertSame(10737418240, $u['bw_limit'], '10 GB bayt olarak okunmali');
+    assertSame(2147483648, $u['bw_used']);
+    assertContains('/json-api/showbw', $t->lastCall()['url']);
+});
+
+test('cPanel usage trafigi accountsummary yerine showbw den alir', function () {
+    list($c, $t) = dna_cpanel();
+    // accountsummary yaniti trafigi YANLIS birimde tasisa bile yok sayilmali.
+    $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1",'
+        . '"diskused":"512M","disklimit":"2048M","totalbytes":"99","limit":"5000"}]}}');
+    $t->push(200, '{"metadata":{"result":1},"data":{"bandwidth":[{"acct":[{"user":"ornek1",'
+        . '"totalbytes":"1024","limit":"2048"}]}]}}');
+    $u = $c->usage('ornek1');
+    assertSame(1024, $u['bw_used']);
+    assertSame(2048, $u['bw_limit']);
+});
+
+test('cPanel usage hesap showbw ciktisinda yoksa trafigi sifirlar', function () {
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1",'
+        . '"diskused":"512M","disklimit":"2048M"}]}}');
+    $t->push(200, '{"metadata":{"result":1},"data":{"bandwidth":[{"acct":[{"user":"baska",'
+        . '"totalbytes":"1024","limit":"2048"}]}]}}');
+    $u = $c->usage('ornek1');
+    assertSame(0, $u['bw_used']);
     assertSame(0, $u['bw_limit']);
 });
 
@@ -180,7 +223,50 @@ test('cPanel createSession tam URL dondurur', function () {
     $url = $c->createSession('ornek1', 'cpaneld', '9.9.9.9');
     assertSame('https://1.2.3.4:2083/cpsess123/', $url);
     assertContains('create_user_session', $t->lastCall()['url']);
-    assertContains('client_ip=9.9.9.9', $t->lastCall()['body']);
+});
+
+test('cPanel createSession yalnizca user ve service gonderir', function () {
+    // WHM API 1'in create_user_session'inda client_ip diye bir arguman yok; WiseCP'nin
+    // kendi cPanel modulu de (cPanel.php:1205, :1259) WHMCS'inki de yalnizca bu ikisini
+    // gonderiyor. Bos bir locale ise WHM tarafindan harfiyen alinabilir.
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"url":"https://1.2.3.4:2083/cpsess123/"}}');
+    $c->createSession('ornek1', 'cpaneld', '9.9.9.9');
+    $body = $t->lastCall()['body'];
+    assertContains('user=ornek1', $body);
+    assertContains('service=cpaneld', $body);
+    assertSame(false, strpos($body, 'client_ip'), 'client_ip gonderilmemeli');
+    assertSame(false, strpos($body, 'locale'), 'bos locale gonderilmemeli');
+});
+
+test('cPanel createSession SSL disi sunucuda hem semayi hem portu indirir', function () {
+    // WHM her zaman SSL portunda bir https URLsi uretir. Yalnizca semayi degistirmek
+    // http://host:2083 verir ve orada dinleyen bir sey yoktur.
+    list($c, $t) = dna_cpanel(0);
+    $t->push(200, '{"metadata":{"result":1},"data":{"url":"https://1.2.3.4:2083/cpsess123/"}}');
+    assertSame('http://1.2.3.4:2082/cpsess123/', $c->createSession('ornek1'));
+});
+
+test('cPanel createSession SSL disi sunucuda goreli URLyi de dogru kurar', function () {
+    list($c, $t) = dna_cpanel(0);
+    $t->push(200, '{"metadata":{"result":1},"data":{"url":"/cpsess123/"}}');
+    assertSame('http://1.2.3.4:2082/cpsess123/', $c->createSession('ornek1'));
+});
+
+test('cPanel createSession http(s) olmayan URLyi reddeder', function () {
+    // URL bir tarayiciya veriliyor; baska bir seyle yanit veren bir panel, musteriyi
+    // gonderecegimiz yer degildir.
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"url":"javascript:alert(1)"}}');
+    assertThrows(function () use ($c) { $c->createSession('ornek1'); }, 'kullanilamaz');
+});
+
+test('cPanel createSession oturum URLsini sir olarak kaydeder', function () {
+    // cpsess jetonu yolun icinde durur: URLnin kendisi canli bir kimlik bilgisidir.
+    list($c, $t, $h) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":1},"data":{"url":"https://1.2.3.4:2083/cpsess1234567/"}}');
+    $url = $c->createSession('ornek1');
+    assertSame('***', $h->mask($url), 'sonraki loglarda maskelenmeli');
 });
 
 test('cPanel createSession goreli URLyi mutlaklastirir', function () {
