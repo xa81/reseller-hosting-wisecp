@@ -242,3 +242,128 @@ test('Plesk findWebspace 11003 hatasinda firlatir', function () {
     }, '11003');
     assertContains('11003', $e->getMessage());
 });
+
+test('Plesk createAccount musteri sonra webspace olusturur', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<service-plan><get><result><status>ok</status>'
+        . '<name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
+    $t->push(200, dna_packet('<ip><get><result><status>ok</status><addresses>'
+        . '<ip><ip_address>10.0.0.2</ip_address><type>shared</type></ip>'
+        . '</addresses></result></get></ip>'));
+    $t->push(200, dna_packet('<customer><add><result><status>ok</status><id>77</id></result></add></customer>'));
+    $t->push(200, dna_packet('<webspace><add><result><status>ok</status><id>9</id></result></add></webspace>'));
+
+    $r = $p->createAccount(array(
+        'username' => 'ornek1', 'password' => 'Gizli.123!', 'domain' => 'ornek.com',
+        'plan' => 'Pro', 'email' => 'a@b.c', 'name' => 'Ornek Musteri',
+        'external_id' => 'wisecp-501',
+    ));
+    assertSame('ornek1', $r['username']);
+    assertSame(77, $r['customer_id']);
+    assertSame(9, $r['webspace_id']);
+
+    $webspaceBody = $t->lastCall()['body'];
+    assertContains('<owner-id>77</owner-id>', $webspaceBody);
+    assertContains('<htype>vrt_hst</htype>', $webspaceBody);
+    assertContains('<plan-name>Pro</plan-name>', $webspaceBody);
+    assertSame(2, substr_count($webspaceBody, '<ip_address>10.0.0.2</ip_address>'),
+        'ip_address hem gen_setup hem vrt_hst altinda gecmeli');
+});
+
+test('Plesk createAccount external-id yazar', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<service-plan><get><result><status>ok</status>'
+        . '<name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
+    $t->push(200, dna_packet('<ip><get><result><status>ok</status><addresses>'
+        . '<ip><ip_address>10.0.0.2</ip_address><type>shared</type></ip>'
+        . '</addresses></result></get></ip>'));
+    $t->push(200, dna_packet('<customer><add><result><status>ok</status><id>77</id></result></add></customer>'));
+    $t->push(200, dna_packet('<webspace><add><result><status>ok</status><id>9</id></result></add></webspace>'));
+    $p->createAccount(array(
+        'username' => 'ornek1', 'password' => 'Gizli.123!', 'domain' => 'ornek.com',
+        'plan' => 'Pro', 'email' => 'a@b.c', 'name' => 'Ornek', 'external_id' => 'wisecp-501',
+    ));
+    assertContains('<external-id>wisecp-501</external-id>', $t->calls[2]['body']);
+});
+
+test('Plesk suspend mevcut duruma 32 bitini ekler', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><get><result><status>ok</status>'
+        . '<data><gen_info><status>16</status></gen_info></data></result></get></webspace>'));
+    $t->push(200, dna_packet('<webspace><set><result><status>ok</status></result></set></webspace>'));
+    assertTrue($p->suspend(9));
+    assertContains('<status>48</status>', $t->lastCall()['body'], '16 | 32 = 48');
+});
+
+test('Plesk unsuspend yalnizca 32 bitini kaldirir', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><get><result><status>ok</status>'
+        . '<data><gen_info><status>48</status></gen_info></data></result></get></webspace>'));
+    $t->push(200, dna_packet('<webspace><set><result><status>ok</status></result></set></webspace>'));
+    assertTrue($p->unsuspend(9));
+    assertContains('<status>16</status>', $t->lastCall()['body'], 'admin askisi korunmali');
+});
+
+test('Plesk terminate external-id tutmuyorsa reddeder', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
+        . '<data><gen_info><login>m</login><external-id>baska-sistem-9</external-id></gen_info></data>'
+        . '</result></get></customer>'));
+    $e = assertThrows(function () use ($p) {
+        $p->terminate(77, 'wisecp-501');
+    }, 'silme reddedildi');
+    assertContains('baska-sistem-9', $e->getMessage());
+    assertSame(1, count($t->calls), 'silme istegi hic gonderilmemeli');
+});
+
+test('Plesk terminate external-id tutuyorsa siler', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
+        . '<data><gen_info><login>m</login><external-id>wisecp-501</external-id></gen_info></data>'
+        . '</result></get></customer>'));
+    $t->push(200, dna_packet('<customer><del><result><status>ok</status></result></del></customer>'));
+    assertTrue($p->terminate(77, 'wisecp-501'));
+    assertContains('<del>', $t->lastCall()['body']);
+});
+
+test('Plesk changePassword hem panel hem FTP sifresini degistirir', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<customer><set><result><status>ok</status></result></set></customer>'));
+    $t->push(200, dna_packet('<webspace><set><result><status>ok</status></result></set></webspace>'));
+    assertTrue($p->changePassword(77, 9, 'YeniGizli.9!'));
+    assertSame(2, count($t->calls));
+    assertContains('<passwd>YeniGizli.9!</passwd>', $t->calls[0]['body']);
+    assertContains('ftp_password', $t->calls[1]['body']);
+});
+
+test('Plesk changePlan switch-subscription ve plan-guid kullanir', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><switch-subscription><result><status>ok</status>'
+        . '</result></switch-subscription></webspace>'));
+    assertTrue($p->changePlan(9, array('name' => 'Pro', 'guid' => 'g-2')));
+    assertContains('<switch-subscription>', $t->lastCall()['body']);
+    assertContains('<plan-guid>g-2</plan-guid>', $t->lastCall()['body']);
+});
+
+test('Plesk usage stat ve limits okur', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><get><result><status>ok</status><data>'
+        . '<stat><real_size>536870912</real_size><traffic>1048576</traffic></stat>'
+        . '<limits><limit><name>disk_space</name><value>2147483648</value></limit>'
+        . '<limit><name>max_traffic</name><value>-1</value></limit></limits>'
+        . '</data></result></get></webspace>'));
+    $u = $p->usage(9);
+    assertSame(536870912, $u['disk_used']);
+    assertSame(2147483648, $u['disk_limit']);
+    assertSame(1048576, $u['bw_used']);
+    assertSame(0, $u['bw_limit'], '-1 sinirsiz demektir, 0 olarak raporlanir');
+});
+
+test('Plesk createSession oturum URLsi kurar', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<server><create_session><result><status>ok</status>'
+        . '<id>SESS123</id></result></create_session></server>'));
+    $url = $p->createSession('ornek1', '9.9.9.9');
+    assertSame('https://5.6.7.8:8443/enterprise/rsession_init.php?PLESKSESSID=SESS123', $url);
+    assertContains('<user_ip>9.9.9.9</user_ip>', $t->lastCall()['body']);
+});

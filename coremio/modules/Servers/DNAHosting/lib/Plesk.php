@@ -284,4 +284,196 @@ class DNAHosting_Plesk
     {
         return htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
     }
+
+    const OUR_SUSPENSION_BIT = 32;
+
+    public function createAccount(array $a)
+    {
+        // Uretilen hesap sifresi de bir sirdir: kayit edilmezse Http onu
+        // maskelemeden loglar.
+        $this->http->addSecret($a['password']);
+
+        $plan = $this->resolvePlan($a['plan']);
+        $ip   = $this->firstSharedIp();
+
+        $customerXml = '<customer><add><gen_info>'
+            . '<pname>' . self::esc($a['name']) . '</pname>'
+            . '<login>' . self::esc($a['username']) . '</login>'
+            . '<passwd>' . self::esc($a['password']) . '</passwd>'
+            . '<email>' . self::esc($a['email']) . '</email>'
+            . '<external-id>' . self::esc($a['external_id']) . '</external-id>'
+            . '</gen_info></add></customer>';
+
+        $packet     = $this->request($customerXml, 'customer.add');
+        $customerId = (int) self::resultOf($packet, 'customer/add')->id;
+
+        // Sira WHMCS 1.6.3.0 sablonuyla birebir: gen_setup, hosting, prefs, plan-name.
+        $webspaceXml = '<webspace><add>'
+            . '<gen_setup>'
+            . '<name>' . self::esc($a['domain']) . '</name>'
+            . '<owner-id>' . $customerId . '</owner-id>'
+            . '<ip_address>' . self::esc($ip) . '</ip_address>'
+            . '<htype>vrt_hst</htype>'
+            . '<status>0</status>'
+            . '</gen_setup>'
+            . '<hosting><vrt_hst>'
+            . '<property><name>ftp_login</name><value>' . self::esc($a['username']) . '</value></property>'
+            . '<property><name>ftp_password</name><value>' . self::esc($a['password']) . '</value></property>'
+            . '<ip_address>' . self::esc($ip) . '</ip_address>'
+            . '</vrt_hst></hosting>'
+            . '<prefs><www>true</www></prefs>'
+            . '<plan-name>' . self::esc($plan['name']) . '</plan-name>'
+            . '</add></webspace>';
+
+        $packet      = $this->request($webspaceXml, 'webspace.add');
+        $webspaceId  = (int) self::resultOf($packet, 'webspace/add')->id;
+
+        return array(
+            'username'    => $a['username'],
+            'password'    => $a['password'],
+            'customer_id' => $customerId,
+            'webspace_id' => $webspaceId,
+        );
+    }
+
+    public function webspaceStatus($webspaceId)
+    {
+        $packet = $this->request(
+            '<webspace><get><filter><id>' . (int) $webspaceId . '</id></filter>'
+            . '<dataset><gen_info/></dataset></get></webspace>',
+            'webspace.get'
+        );
+        $result = self::resultOf($packet, 'webspace/get');
+        return (int) $result->data->gen_info->status;
+    }
+
+    public function suspend($webspaceId)
+    {
+        return $this->setStatus($webspaceId, $this->webspaceStatus($webspaceId) | self::OUR_SUSPENSION_BIT);
+    }
+
+    public function unsuspend($webspaceId)
+    {
+        return $this->setStatus($webspaceId, $this->webspaceStatus($webspaceId) & ~self::OUR_SUSPENSION_BIT);
+    }
+
+    private function setStatus($webspaceId, $status)
+    {
+        $packet = $this->request(
+            '<webspace><set><filter><id>' . (int) $webspaceId . '</id></filter>'
+            . '<values><gen_setup><status>' . (int) $status . '</status></gen_setup></values>'
+            . '</set></webspace>',
+            'webspace.set'
+        );
+        self::resultOf($packet, 'webspace/set');
+        return true;
+    }
+
+    public function terminate($customerId, $expectedExternalId)
+    {
+        $actual = $this->customerExternalId($customerId);
+        if ($actual !== (string) $expectedExternalId) {
+            throw new DNAHosting_Exception(
+                'Guvenlik nedeniyle silme reddedildi: paneldeki musterinin external-id degeri "'
+                . ($actual !== '' ? $actual : '(bos)') . '", beklenen "' . $expectedExternalId . '". '
+                . 'Bu abonelik bu modul tarafindan olusturulmamis; elle silmeniz gerekir.'
+            );
+        }
+
+        $packet = $this->request(
+            '<customer><del><filter><id>' . (int) $customerId . '</id></filter></del></customer>',
+            'customer.del'
+        );
+        self::resultOf($packet, 'customer/del');
+        return true;
+    }
+
+    public function changePassword($customerId, $webspaceId, $password)
+    {
+        $this->http->addSecret($password);
+
+        $packet = $this->request(
+            '<customer><set><filter><id>' . (int) $customerId . '</id></filter>'
+            . '<values><gen_info><passwd>' . self::esc($password) . '</passwd></gen_info></values>'
+            . '</set></customer>',
+            'customer.set'
+        );
+        self::resultOf($packet, 'customer/set');
+
+        $packet = $this->request(
+            '<webspace><set><filter><id>' . (int) $webspaceId . '</id></filter>'
+            . '<values><hosting><vrt_hst>'
+            . '<property><name>ftp_password</name><value>' . self::esc($password) . '</value></property>'
+            . '</vrt_hst></hosting></values>'
+            . '</set></webspace>',
+            'webspace.set'
+        );
+        self::resultOf($packet, 'webspace/set');
+        return true;
+    }
+
+    public function changePlan($webspaceId, array $plan)
+    {
+        $packet = $this->request(
+            '<webspace><switch-subscription><filter><id>' . (int) $webspaceId . '</id></filter>'
+            . '<plan-guid>' . self::esc($plan['guid']) . '</plan-guid>'
+            . '</switch-subscription></webspace>',
+            'webspace.switch-subscription'
+        );
+        self::resultOf($packet, 'webspace/switch-subscription');
+        return true;
+    }
+
+    public function usage($webspaceId)
+    {
+        $packet = $this->request(
+            '<webspace><get><filter><id>' . (int) $webspaceId . '</id></filter>'
+            . '<dataset><stat/><limits/></dataset></get></webspace>',
+            'webspace.get'
+        );
+        $result = self::resultOf($packet, 'webspace/get');
+
+        $limits = array();
+        if (isset($result->data->limits->limit)) {
+            foreach ($result->data->limits->limit as $limit) {
+                $limits[(string) $limit->name] = (float) $limit->value;
+            }
+        }
+
+        return array(
+            'disk_used'  => isset($result->data->stat->real_size) ? (int) $result->data->stat->real_size : 0,
+            'disk_limit' => self::limitToBytes($limits, 'disk_space'),
+            'bw_used'    => isset($result->data->stat->traffic) ? (int) $result->data->stat->traffic : 0,
+            'bw_limit'   => self::limitToBytes($limits, 'max_traffic'),
+        );
+    }
+
+    private static function limitToBytes(array $limits, $name)
+    {
+        if (!isset($limits[$name]) || $limits[$name] < 0) {
+            return 0;
+        }
+        return (int) $limits[$name];
+    }
+
+    public function createSession($login, $clientIp)
+    {
+        $packet = $this->request(
+            '<server><create_session>'
+            . '<login>' . self::esc($login) . '</login>'
+            . '<data><user_ip>' . self::esc($clientIp) . '</user_ip><source_server/></data>'
+            . '</create_session></server>',
+            'server.create_session'
+        );
+        $result = self::resultOf($packet, 'server/create_session');
+
+        $sessionId = (string) $result->id;
+        if ($sessionId === '') {
+            throw new DNAHosting_Exception('Plesk oturum kimligi dondurmedi.');
+        }
+
+        return ($this->server['secure'] ? 'https' : 'http') . '://'
+            . $this->server['ip'] . ':' . $this->server['port']
+            . '/enterprise/rsession_init.php?PLESKSESSID=' . rawurlencode($sessionId);
+    }
 }
