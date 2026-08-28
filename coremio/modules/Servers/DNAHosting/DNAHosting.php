@@ -183,7 +183,16 @@ class DNAHosting_Module extends ServerModule
 
     public function UsernameGenerator($domain = '', $half_mixed = false)
     {
-        return DNAHosting_Support::usernameFor($domain, $this->panel());
+        try {
+            $panel = $this->panel();
+        } catch (Exception $e) {
+            // Panel tespiti basarisiz oldu; sessizce cPanel kurallarina duser (8 karakter,
+            // harfle basla, [a-z0-9]) — bu kurallara uyan bir ad Plesk icin de gecerlidir,
+            // bu yuzden dogru panel sonradan belirlense bile ad reddedilmez. Bu bir
+            // hata degil, zarif bir geri dusustur; $this->error kasitli olarak set edilmez.
+            $panel = 'cpanel';
+        }
+        return DNAHosting_Support::usernameFor($domain, $panel);
     }
 
     private function planOf(array $options)
@@ -230,6 +239,10 @@ class DNAHosting_Module extends ServerModule
 
             $created = $this->driver()->createAccount($account);
 
+            // Sifre burada bilerek acik metin: WiseCP cekirdeginin createAccount kaydetme
+            // yolu ftp_info.password'u kendisi Crypt::encode() ile sarmalayip oyle saklar
+            // (coremio/helpers/orders.php:2851-2853). Burada onceden kodlarsak cift kodlama
+            // olur ve cekirdegin decode_str() cagrisi cozemez.
             return array(
                 'username' => $created['username'],
                 'password' => $created['password'],
@@ -447,6 +460,11 @@ class DNAHosting_Module extends ServerModule
             $newConfig['password'] = $this->encode_str($plain);
         }
 
+        // Sifre burada bilerek kodlanmis (encode_str()): apply_options()'un donus degeri
+        // cekirdek tarafindan araya bir kodlama adimi girmeden dogrudan kaydedilir
+        // (coremio/controllers/admin/orders.php:4340-4346). Aktivasyon e-postasi ise
+        // config.password ve ftp_info.password uzerinde kosulsuzca decode_str() calistirir
+        // (coremio/classes/Modules.php); acik metin birakirsak o cozme adimi bozulur.
         $domain = isset($new_options['domain']) ? $new_options['domain'] : $this->orderDomain();
         $new_options['config']   = $newConfig;
         $new_options['ftp_info'] = array(

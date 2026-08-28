@@ -217,3 +217,27 @@ test('Modul UsernameGenerator panele uygun ad uretir', function () {
     $u = $m->UsernameGenerator('cokuzunbirdomain.com');
     assertTrue(strlen($u) <= 8, 'cPanel icin 8i asmamali: ' . $u);
 });
+
+test('Modul UsernameGenerator panel tespiti basarisiz olunca cPanel kurallarina duser', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(403, 'Access denied');
+        $t->push(403, 'Access denied');
+    });
+    $u = $m->UsernameGenerator('ornek.com');
+    assertTrue(strlen($u) > 0 && strlen($u) <= 8, 'cPanel kurallarina uygun olmali: ' . $u);
+    assertTrue((bool) preg_match('/^[a-z][a-z0-9]*$/', $u), 'desene uymuyor: ' . $u);
+    assertSame(null, $m->error, 'zarif geri dusus hata olarak isaretlenmemeli');
+});
+
+test('Modul apply_options kodlanmis sifreyi hem config hem ftp_info alaninda doner', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    });
+    $old = array('config' => array('user' => 'ornek1', 'password' => 'ENC:eskisifre'));
+    $new = array('config' => array('user' => 'ornek1', 'password' => 'yenisifre123'), 'domain' => 'ornek.com');
+    $r = $m->apply_options($old, $new);
+    assertTrue(is_array($r), 'dizi bekleniyordu, error: ' . $m->error);
+    assertSame('ENC:yenisifre123', $r['config']['password']);
+    assertSame('ENC:yenisifre123', $r['ftp_info']['password']);
+});
