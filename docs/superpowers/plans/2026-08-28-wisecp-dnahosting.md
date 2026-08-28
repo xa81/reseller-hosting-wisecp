@@ -841,7 +841,7 @@ class DNAHosting_Cpanel
 php tests/run.php
 ```
 
-Beklenen: `22 gecti, 0 kaldi`
+Beklenen: `23 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -1116,7 +1116,7 @@ Not: `create_user_session` okuma beyaz listesinde **değildir** — oturum üret
 php tests/run.php
 ```
 
-Beklenen: `31 gecti, 0 kaldi`
+Beklenen: `32 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -1420,7 +1420,7 @@ class DNAHosting_Plesk
 php tests/run.php
 ```
 
-Beklenen: `40 gecti, 0 kaldi`
+Beklenen: `41 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -1688,7 +1688,7 @@ Sınıfın özellik bildirimlerine `private $plans = null;` ekle.
 php tests/run.php
 ```
 
-Beklenen: `49 gecti, 0 kaldi`
+Beklenen: `50 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -2058,7 +2058,7 @@ Beklenen: `Call to undefined method DNAHosting_Plesk::createAccount()`
 php tests/run.php
 ```
 
-Beklenen: `59 gecti, 0 kaldi`
+Beklenen: `60 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -2336,7 +2336,7 @@ class DNAHosting_Detector
 php tests/run.php
 ```
 
-Beklenen: `67 gecti, 0 kaldi`
+Beklenen: `68 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -2501,7 +2501,7 @@ class DNAHosting_Support
 php tests/run.php
 ```
 
-Beklenen: `72 gecti, 0 kaldi`
+Beklenen: `73 gecti, 0 kaldi`
 
 - [ ] **Step 5: `config.php`, `init.php` ve dil dosyalarını yaz**
 
@@ -2947,7 +2947,7 @@ class DNAHosting_Module extends ServerModule
 php tests/run.php
 ```
 
-Beklenen: `80 gecti, 0 kaldi`
+Beklenen: `81 gecti, 0 kaldi`
 
 - [ ] **Step 10: Commit**
 
@@ -3404,7 +3404,7 @@ Aşağıdakileri sınıfa ekle:
 php tests/run.php
 ```
 
-Beklenen: `89 gecti, 0 kaldi`
+Beklenen: `90 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -3752,7 +3752,7 @@ Aşağıdakileri sınıfa ekle (Task 9 geçici bir sonda bırakmadı — `DNAHos
 php tests/run.php
 ```
 
-Beklenen: `97 gecti, 0 kaldi`
+Beklenen: `98 gecti, 0 kaldi`
 
 - [ ] **Step 7: Commit**
 
@@ -3920,7 +3920,7 @@ Beklenen: her dosya için `No syntax errors detected`
 php tests/run.php
 ```
 
-Beklenen: `97 gecti, 0 kaldi`
+Beklenen: `98 gecti, 0 kaldi`
 
 - [ ] **Step 6: Commit**
 
@@ -3964,7 +3964,7 @@ Beklenen: **hiçbir çıktı yok.** Çıktı veren her dosya guard'dan yoksundur
 php tests/run.php
 ```
 
-Beklenen: `97 gecti, 0 kaldi`
+Beklenen: `98 gecti, 0 kaldi`
 
 - [ ] **Step 4: `README.md` yaz**
 
