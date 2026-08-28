@@ -305,3 +305,42 @@ test('Modul root SSO metodu tanimlamaz', function () {
     assertSame(false, method_exists('DNAHosting_Module', 'use_adminArea_root_SingleSignOn'),
         'root erisimimiz yok, buton gosterilmemeli');
 });
+
+test('Modul getSummary ilk cagride dogru paneli tespit eder', function () {
+    // getSummary() ilk cagrida panel() metodunu kullanmalidir; $this->panel ham ozelligi
+    // henuz doldurulmamis olur — bu test tam da o hatayi yakalamak icin yazildi.
+    list($m, $t) = dna_module_n(8443, function ($t) {
+        $t->push(200, '<?xml version="1.0"?><packet><server><get><result>'
+            . '<status>ok</status></result></get></server></packet>');
+    });
+    $m->config['user'] = 'ornek1';
+    $s = $m->getSummary();
+    assertTrue(is_array($s), 'dizi bekleniyordu');
+    assertSame($m->lang['panel-plesk'], $s['panel']);
+});
+
+test('Modul getSummary panel tespiti basarisiz olunca panel alanini atlar', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(403, 'Access denied');
+        $t->push(403, 'Access denied');
+    });
+    $m->config['user'] = 'ornek1';
+    $s = $m->getSummary();
+    assertTrue(is_array($s), 'dizi bekleniyordu');
+    assertSame(false, isset($s['panel']), 'panel tespit edilemedigi icin alan atlanmali');
+    assertSame(null, $m->error, 'goruntuleme yardimcisi servis hatasi uretmemeli');
+});
+
+test('Modul use_clientArea_SingleSignOn hata durumunda false doner ve mesaji basar', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(403, 'Access denied');
+        $t->push(403, 'Access denied');
+    });
+    $m->config['user'] = 'ornek1';
+    ob_start();
+    $result = $m->use_clientArea_SingleSignOn();
+    $output = ob_get_clean();
+    assertSame(false, $result);
+    assertContains('Access denied', $m->error);
+    assertContains('Access denied', $output);
+});

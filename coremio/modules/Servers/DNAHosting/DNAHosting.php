@@ -530,10 +530,17 @@ class DNAHosting_Module extends ServerModule
         if (!isset($this->config['user']) || $this->config['user'] === '') {
             return false;
         }
-        return array(
-            'panel'  => $this->panel === 'plesk' ? $this->lang['panel-plesk'] : $this->lang['panel-cpanel'],
-            'domain' => $this->orderDomain(),
-        );
+
+        $summary = array('domain' => $this->orderDomain());
+        try {
+            $panel = $this->panel();
+            $summary['panel'] = $panel === 'plesk' ? $this->lang['panel-plesk'] : $this->lang['panel-cpanel'];
+        } catch (Exception $e) {
+            // Bu bir goruntuleme yardimcisidir: panel tespiti basarisiz olursa
+            // yanlis bir etiket uydurmak yerine 'panel' alani sessizce atlanir.
+            // $this->error kasitli olarak set edilmez.
+        }
+        return $summary;
     }
 
     private static function clientIp()
@@ -601,13 +608,28 @@ class DNAHosting_Module extends ServerModule
 
     public function clientArea()
     {
+        try {
+            $panel = $this->panel();
+        } catch (Exception $e) {
+            // Goruntuleme yardimcisi: panel tespit edilemezse sablona bos birakilir,
+            // hata firlatilmaz ve $this->error kasitli olarak set edilmez.
+            $panel = '';
+        }
+
         $page = $this->page ? $this->page : 'home';
         return $this->get_page('clientArea-' . $page, array(
             'LANG'     => $this->lang,
-            'panel'    => $this->panel,
+            'panel'    => $panel,
             'username' => isset($this->config['user']) ? $this->config['user'] : '',
             'domain'   => $this->orderDomain(),
-            'server'   => $this->server,
+            // Yalnizca sablonun ihtiyac duyabilecegi alanlar aktarilir; $this->server
+            // bayi API sifresini de tasir ve musteri tarayicisina cizilen bir kapsama
+            // asla girmemelidir.
+            'server'   => array(
+                'ip'     => isset($this->server['ip']) ? $this->server['ip'] : '',
+                'port'   => isset($this->server['port']) ? $this->server['port'] : '',
+                'secure' => isset($this->server['secure']) ? $this->server['secure'] : '',
+            ),
         ));
     }
 }
