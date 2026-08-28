@@ -1,0 +1,22 @@
+<?php
+    return [
+        'name'        => "DNA Bayi Hosting",
+        'description' => "cPanel/WHM veya Plesk bayi hesabı üzerinden paylaşımlı hosting satın. Panel tipi otomatik tespit edilir.",
+        'select-plan'      => "Paket / Plan",
+        'no-plans'         => "Bu sunucuda hiç paket bulunamadı.",
+        'panel-cpanel'     => "cPanel / WHM",
+        'panel-plesk'      => "Plesk",
+        'detected-panel'   => "Tespit edilen panel",
+        'login-panel'      => "Kontrol Paneline Giriş",
+        'username'         => "Kullanıcı Adı",
+        'password'         => "Şifre",
+        'domain'           => "Alan Adı",
+        'ftp-host'         => "FTP Sunucusu",
+        'ftp-port'         => "FTP Portu",
+        'disk-usage'       => "Disk Kullanımı",
+        'bandwidth-usage'  => "Trafik Kullanımı",
+        'error-no-order'   => "Bu hizmetin henüz bir panel hesabı yok.",
+        'error-no-plan'    => "Yükseltilecek ürün için bir paket/plan seçilmemiş. Ürünü düzenleyip modül bölümünden bir paket seçin; aksi halde paket değişikliği uygulanamaz.",
+        'error-domain-change-plesk' => "Plesk tarafında alan adı buradan değiştirilemez: hizmet panelde \"{old}\" aboneliğine bağlı, \"{new}\" değil. Değişiklik kaydedilseydi askıya alma, şifre değiştirme ve sonlandırma dahil her işlem kalıcı olarak başarısız olurdu. Önce Plesk panelinde aboneliğin adını değiştirin, sonra burayı güncelleyin; ya da hizmeti sonlandırıp yeniden oluşturun.",
+        'error-shared-domain' => "Bu alan adı aynı sunucuda başka bir aktif hizmet tarafından hâlâ kullanılıyor, bu yüzden sonlandırılmadı.",
+    ];
