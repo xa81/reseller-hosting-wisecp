@@ -8,6 +8,7 @@ class DNAHosting_Http
     private $transport = null;
     private $logger    = null;
     private $secrets   = array();
+    private $redactions = array();
 
     public function __construct($baseUrl)
     {
@@ -50,6 +51,53 @@ class DNAHosting_Http
         return $text;
     }
 
+    /**
+     * Bir eylemin YANIT govdesine, loga yazilmadan once uygulanacak desenler.
+     *
+     * addSecret() yalnizca degeri ONCEDEN bilinen sirlar icindir. Oturum acma
+     * cagrilarinda kimlik bilgisi yanitin KENDISINDE gelir: cagiran onu ancak
+     * send() satiri loglandiktan SONRA addSecret'e verebilir, yani jetonu tasiyan
+     * satirin kendisi maskesiz kalir. Desen ise deger bilinmeden once kaydedilir.
+     *
+     * Kapsam bilerek eylem adidir, tek atimlik bir bayrak degil: Plesk request()
+     * kimlik hatasinda IKINCI bir istek atar ve tek atimlik bir bayrak orada
+     * tukenip asil yaniti maskesiz birakirdi.
+     *
+     * @param string $action   send()'e verilen eylem adi
+     * @param array  $patterns desen => yerine konacak metin (preg_replace)
+     */
+    public function addResponseRedaction($action, array $patterns)
+    {
+        $action = (string) $action;
+        if (!isset($this->redactions[$action])) {
+            $this->redactions[$action] = array();
+        }
+        foreach ($patterns as $pattern => $replacement) {
+            $this->redactions[$action][$pattern] = $replacement;
+        }
+        return $this;
+    }
+
+    /**
+     * Kayitli desenleri uygular. Desen calistirilamazsa (ornegin PCRE geri izleme
+     * siniri) govde OLDUGU GIBI BIRAKILMAZ; bir guvenlik denetiminin sessizce
+     * acilmasindansa teshis kaybi yeglenir.
+     */
+    private function redactResponse($action, $body)
+    {
+        if (empty($this->redactions[$action])) {
+            return $body;
+        }
+        foreach ($this->redactions[$action] as $pattern => $replacement) {
+            $replaced = preg_replace($pattern, $replacement, $body);
+            if ($replaced === null) {
+                return '[yanit gizlendi: redaksiyon uygulanamadi]';
+            }
+            $body = $replaced;
+        }
+        return $body;
+    }
+
     public function send($method, $path, array $headers, $body, $action)
     {
         $url       = $this->base . $path;
@@ -69,10 +117,16 @@ class DNAHosting_Http
 
         $status = (int) $result['status'];
         $rbody  = (string) $result['body'];
-        $this->log($action, $logRequest, $this->mask('HTTP ' . $status . "\n\n" . $rbody));
+
+        // Redaksiyon YALNIZCA log ve hata kopyasina uygulanir: cagirana ham govde
+        // doner, yoksa oturum URLsi ayristirilamazdi.
+        $safeBody = $this->redactResponse($action, $rbody);
+        $this->log($action, $logRequest, $this->mask('HTTP ' . $status . "\n\n" . $safeBody));
 
         if ($status >= 400) {
-            $summary = self::summarise($rbody);
+            // Ozet de redakte edilmis govdeden alinir: bu metin hata mesaji olarak
+            // admin arayuzune ve musterinin tarayicisina kadar gidiyor.
+            $summary = self::summarise($safeBody);
             throw new DNAHosting_Exception($this->mask('HTTP ' . $status . ($summary ? ': ' . $summary : '')));
         }
 

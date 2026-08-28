@@ -17,6 +17,14 @@ class DNAHosting_Plesk
         $this->http   = $http;
         $this->http->addSecret($server['password']);
         $this->http->setTimeout(300);
+
+        // server.create_session yaniti PLESKSESSID'yi tasir; onu ancak cagri
+        // loglandiktan sonra addSecret'e verebiliriz. Desen burada, deger
+        // bilinmeden once kaydedilir. Kapsam bu eylemle sinirli oldugu icin
+        // diger cagrilarin <id> alanlari (webspace, customer) okunur kalir.
+        $this->http->addResponseRedaction('server.create_session', array(
+            '/(<id>)[^<]*(<\/id>)/' => '$1***$2',
+        ));
     }
 
     public function setAuthMode($mode)

@@ -16,6 +16,15 @@ class DNAHosting_Cpanel
         $this->server = $server;
         $this->http   = $http;
         $this->http->addSecret($server['password']);
+
+        // create_user_session yanitinin KENDISI canli bir kimlik bilgisidir; onu
+        // ancak cagri loglandiktan sonra addSecret'e verebiliriz. Desen burada,
+        // deger bilinmeden once kaydedilir. Yalnizca kimlik alanlari gizlenir:
+        // metadata/reason teshis icin gorunur kalir.
+        $this->http->addResponseRedaction('create_user_session', array(
+            '/("(?:url|session|cp_security_token)"\s*:\s*")[^"]*(")/i' => '$1***$2',
+            '/cpsess[0-9]+/i' => 'cpsess***',
+        ));
     }
 
     public function call($function, array $args = array())

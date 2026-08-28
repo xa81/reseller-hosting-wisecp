@@ -269,6 +269,40 @@ test('cPanel createSession oturum URLsini sir olarak kaydeder', function () {
     assertSame('***', $h->mask($url), 'sonraki loglarda maskelenmeli');
 });
 
+test('cPanel createSession jetonu URETEN cagrinin log satirina yazmaz', function () {
+    // addSecret ancak SONRAKI satirlari kurtarir: jetonu tasiyan satir, cagri
+    // loglandigi anda henuz sir listesinde olmayan bir degeri icerir. Tasarim
+    // dokumani (S6) oturum URLsinin loga YAZILMADAN once maskelenmesini sart kosar.
+    list($c, $t, $h) = dna_cpanel();
+    $lines = array();
+    $h->setLogger(function ($action, $request, $response) use (&$lines) {
+        $lines[] = $action . "\n" . $request . "\n" . $response;
+    });
+    $t->push(200, '{"metadata":{"result":1},"data":{'
+        . '"url":"https://1.2.3.4:2083/cpsess1234567/login/?session=ornek1%3acpsess1234567",'
+        . '"cp_security_token":"/cpsess1234567",'
+        . '"session":"ornek1:GIZLIJETON9876"}}');
+    $url = $c->createSession('ornek1');
+
+    $log = implode("\n", $lines);
+    assertSame(false, strpos($log, 'cpsess1234567'), 'cpsess jetonu loga duz yazilmamali');
+    assertSame(false, strpos($log, 'GIZLIJETON9876'), 'session alani loga duz yazilmamali');
+    // Redaksiyon yalnizca log kopyasina uygulanir; tarayiciya giden URL saglam kalmali.
+    assertContains('cpsess1234567', $url, 'donen URL redakte edilmemeli');
+});
+
+test('cPanel redaksiyonu yalnizca oturum cagrisina bakar, diger yanitlar okunur kalir', function () {
+    // Fazla redaksiyon da bir hatadir: listaccts yaniti teshis icin gorunur kalmali.
+    list($c, $t, $h) = dna_cpanel();
+    $lines = array();
+    $h->setLogger(function ($action, $request, $response) use (&$lines) {
+        $lines[] = $response;
+    });
+    $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1"}]}}');
+    $c->call('listaccts');
+    assertContains('"user":"ornek1"', implode("\n", $lines));
+});
+
 test('cPanel createSession goreli URLyi mutlaklastirir', function () {
     list($c, $t) = dna_cpanel();
     $t->push(200, '{"metadata":{"result":1},"data":{"url":"/cpsess123/"}}');

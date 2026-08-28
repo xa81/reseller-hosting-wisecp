@@ -593,3 +593,64 @@ test('Plesk createSession oturum kimligini sir olarak kaydeder', function () {
     $p->createSession('ornek1', '9.9.9.9');
     assertSame('PLESKSESSID=***', $h->mask('PLESKSESSID=SESS1234567'));
 });
+
+test('Plesk createSession kimligi URETEN cagrinin log satirina yazmaz', function () {
+    // addSecret ancak SONRAKI satirlari kurtarir: kimligi tasiyan yanit, cagri
+    // loglandigi anda henuz sir listesinde olmayan bir degeri icerir.
+    list($p, $t, $h) = dna_plesk();
+    $lines = array();
+    $h->setLogger(function ($action, $request, $response) use (&$lines) {
+        $lines[] = $action . "\n" . $request . "\n" . $response;
+    });
+    $t->push(200, dna_packet('<server><create_session><result><status>ok</status>'
+        . '<id>SESS1234567</id></result></create_session></server>'));
+    $url = $p->createSession('ornek1', '9.9.9.9');
+
+    $log = implode("\n", $lines);
+    assertSame(false, strpos($log, 'SESS1234567'), 'PLESKSESSID loga duz yazilmamali');
+    // Redaksiyon yalnizca log kopyasina uygulanir; tarayiciya giden URL saglam kalmali.
+    assertContains('SESS1234567', $url, 'donen URL redakte edilmemeli');
+});
+
+test('Plesk createSession basic autha duserken ikinci yaniti da redakte eder', function () {
+    // request() kimlik hatasinda IKINCI bir istek atar. Redaksiyon eylem adina
+    // bagli oldugu icin iki yanit da kapsanir; tek atimlik bir bayrak burada delinirdi.
+    list($p, $t, $h) = dna_plesk();
+    $lines = array();
+    $h->setLogger(function ($action, $request, $response) use (&$lines) {
+        $lines[] = $response;
+    });
+    $t->push(200, dna_packet('<system><status>error</status><errcode>1001</errcode>'
+        . '<errtext>Authentication failed</errtext></system>'));
+    $t->push(200, dna_packet('<server><create_session><result><status>ok</status>'
+        . '<id>SESS7654321</id></result></create_session></server>'));
+    $p->createSession('ornek1', '9.9.9.9');
+
+    assertSame(false, strpos(implode("\n", $lines), 'SESS7654321'), 'fallback yaniti da redakte edilmeli');
+});
+
+test('Plesk create_session redaksiyonu hata teshisini bozmaz', function () {
+    // Govdenin tamami degil, yalnizca <id> gizlenir: errtext teshis icin gorunur kalmali.
+    list($p, $t, $h) = dna_plesk();
+    $lines = array();
+    $h->setLogger(function ($action, $request, $response) use (&$lines) {
+        $lines[] = $response;
+    });
+    $t->push(200, dna_packet('<system><status>error</status><errcode>1005</errcode>'
+        . '<errtext>login name is not found</errtext></system>'));
+    assertThrows(function () use ($p) { $p->createSession('yokkullanici', '9.9.9.9'); }, 'login name');
+    assertContains('login name is not found', implode("\n", $lines), 'hata metni logda kalmali');
+});
+
+test('Plesk redaksiyonu yalnizca oturum cagrisina bakar, diger id alanlari okunur kalir', function () {
+    // Fazla redaksiyon da bir hatadir: webspace/customer id teshis icin gorunur kalmali.
+    list($p, $t, $h) = dna_plesk();
+    $lines = array();
+    $h->setLogger(function ($action, $request, $response) use (&$lines) {
+        $lines[] = $response;
+    });
+    $t->push(200, dna_packet('<webspace><get><result><status>ok</status>'
+        . '<id>4242</id></result></get></webspace>'));
+    $p->request('<webspace><get/></webspace>', 'webspace.get');
+    assertContains('<id>4242</id>', implode("\n", $lines));
+});
