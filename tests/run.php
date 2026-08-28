@@ -13,7 +13,7 @@ function test($name, callable $fn)
         $fn();
         $GLOBALS['dna_pass']++;
         echo ".";
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         $GLOBALS['dna_fail']++;
         $GLOBALS['dna_errors'][] = $name . "\n    " . $e->getMessage();
         echo "F";
@@ -55,7 +55,7 @@ function assertThrows(callable $fn, $expectedMessageSubstring, $msg = '')
 {
     try {
         $fn();
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         assertContains($expectedMessageSubstring, $e->getMessage(), $msg);
         return $e;
     }
