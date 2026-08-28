@@ -1,23 +1,66 @@
-# DNA Reseller Hosting
+<h1 align="center">DNA Reseller Hosting</h1>
 
-**Tek WiseCP sunucu modülüyle hem cPanel/WHM hem Plesk üzerinden paylaşımlı hosting satın.**
+<p align="center">
+  <strong>Tek WiseCP sunucu modülüyle hem cPanel/WHM hem Plesk üzerinden paylaşımlı hosting satın.</strong><br>
+  Bir modül, iki panel — panel tipini siz seçmezsiniz, modül kendisi bulur.
+</p>
 
-Bir modül, iki panel. Sunucuyu tanımlarsınız; modül o sunucunun cPanel/WHM mi Plesk mi çalıştırdığını
-**kendisi bulur** — hiçbir yerde panel tipi seçmezsiniz.
+<p align="center">
+  <img alt="WiseCP" src="https://img.shields.io/badge/WiseCP-self--hosted-4A90D9?style=flat-square">
+  <img alt="PHP" src="https://img.shields.io/badge/PHP-7.4%20%E2%80%93%208.4-777BB4?style=flat-square&logo=php&logoColor=white">
+  <img alt="cPanel/WHM" src="https://img.shields.io/badge/cPanel%2FWHM-destekleniyor-FF6C2C?style=flat-square">
+  <img alt="Plesk" src="https://img.shields.io/badge/Plesk-destekleniyor-53BCE6?style=flat-square">
+  <img alt="Lisans" src="https://img.shields.io/badge/lisans-özel-lightgrey?style=flat-square">
+</p>
 
-![WiseCP](https://img.shields.io/badge/WiseCP-self--hosted-4A90D9?style=flat-square)
-![PHP](https://img.shields.io/badge/PHP-7.4%20%E2%80%93%208.4-777BB4?style=flat-square&logo=php&logoColor=white)
-![cPanel](https://img.shields.io/badge/cPanel%2FWHM-destekleniyor-FF6C2C?style=flat-square)
-![Plesk](https://img.shields.io/badge/Plesk-destekleniyor-53BCE6?style=flat-square)
-![Lisans](https://img.shields.io/badge/lisans-özel-lightgrey?style=flat-square)
+<p align="center">
+  <strong>Türkçe</strong>
+  · <a href="README.en.md">English</a>
+  · <a href="README.de.md">Deutsch</a>
+  · <a href="README.ru.md">Русский</a>
+  · <a href="README.az.md">Azərbaycan</a>
+  · <a href="README.ar.md">العربية</a>
+  · <a href="README.es.md">Español</a>
+  · <a href="README.fr.md">Français</a>
+</p>
 
 ---
 
-## Ne yapar
+## İçindekiler
+
+- [Genel bakış](#genel-bakış)
+- [Özellik matrisi](#özellik-matrisi)
+- [Gereksinimler](#gereksinimler)
+- [Kurulum](#kurulum)
+- [Yapılandırma](#yapılandırma)
+  - [Adım 1 — Sunucu ekleme](#adım-1--sunucu-ekleme)
+  - [Adım 2 — Sunucu grupları (isteğe bağlı)](#adım-2--sunucu-grupları-isteğe-bağlı)
+  - [Adım 3 — Ürünü tanımlama](#adım-3--ürünü-tanımlama)
+- [Sorun giderme](#sorun-giderme)
+- [Loglar](#loglar)
+- [Değişiklik günlüğü](#değişiklik-günlüğü)
+- [Lisans](#lisans)
+
+---
+
+## Genel bakış
 
 Tek bir sunucu kaydı üzerinden iki panel ailesini de sürer. IP, bayi kullanıcı adı ve bir kimlik
 bilgisi girersiniz; modül sunucuyu gerçekten sorgular — tahmin değil, gerçek bir API çağrısı — ve
 hangi panelin yanıt verdiğini hatırlar.
+
+| | |
+|---|---|
+| **Modül türü** | WiseCP sunucu (Servers) modülü |
+| **Klasör adı** | `DNAHosting` |
+| **Sürüm** | 1.0.0 |
+| **Desteklenen paneller** | cPanel/WHM, Plesk |
+| **PHP** | 7.4 – 8.4 |
+| **Arayüz dilleri** | Türkçe, English (`lang/tr.php`, `lang/en.php`) |
+
+---
+
+## Özellik matrisi
 
 | İşlem | cPanel/WHM | Plesk |
 |---|:---:|:---:|
@@ -30,27 +73,6 @@ hangi panelin yanıt verdiğini hatırlar.
 | Disk ve trafik kullanımı (müşterinin hizmet sayfasında) | ✔ | ✔ |
 | Tek tıkla panel girişi — müşteri paneli | ✔ | ✔ |
 | Tek tıkla panel girişi — yönetici paneli | ✔ | ✔ |
-
-Baştan bilinmesi gereken üç koruma:
-
-- **Mükerrer alan adı koruması.** Aynı alan adı aynı sunucuda başka bir aktif ya da askıdaki hizmette
-  hâlâ duruyorsa sonlandırma reddedilir. Bir alan adının hostingi, onu kullanan ikinci ve hâlâ canlı
-  bir siparişin altından çekilemez.
-- **Plesk sahiplik koruması.** Modülün Plesk'te açtığı her hesap dahilî bir kimlikle etiketlenir. Bir
-  Plesk aboneliğinde **herhangi bir** işlem yapılmadan önce — askıya alma, askıdan indirme, şifre
-  değiştirme, plan değiştirme, kullanım, sonlandırma — bu etiket kontrol edilir ve tutmuyorsa işlem
-  reddedilir; modül panelde elle oluşturulmuş bir aboneliğe asla yönlendirilemez. Sonlandırmada önce
-  abonelik silinir, müşteri ise ancak başka hiçbir aboneliği kalmadıysa kaldırılır. Bu sayı
-  belirlenemezse müşteriye dokunulmaz.
-- **Plesk'te alan adı değişikliği reddedilir.** Bir Plesk aboneliği alan adıyla bulunduğundan, mevcut
-  bir hizmetin alan adını düzenlemek modülü o aboneliği bir daha bulamaz hâle getirir — sonlandırma
-  dahil sonraki her işlem kalıcı olarak başarısız olur. Böyle bir kayıt, "önce Plesk'te aboneliği
-  yeniden adlandırın ya da sonlandırıp yeniden oluşturun" diyen bir mesajla reddedilir. cPanel'de alan
-  adı düzenlenebilir; hesap, siz panelde değiştirene kadar eski alan adına hizmet vermeye devam eder.
-
-**Kapsam dışı:** e-posta hesabı ve yönlendirme yönetimi, bayi hesabı satışı, mevcut hesapların
-WiseCP'ye içe aktarılması ve yöneticide "root paneline giriş" butonu. Modül yalnızca bir **bayi**
-kimlik bilgisi tutar — root değil — dolayısıyla açabileceği bir root paneli yoktur.
 
 ---
 
@@ -83,7 +105,9 @@ görünür.
 
 ---
 
-## Sunucu ekleme
+## Yapılandırma
+
+### Adım 1 — Sunucu ekleme
 
 **Ürünler / Hizmetler → Hosting/Sunucu → Paylaşımlı Sunucu Ayarları → `Yeni Paylaşımlı Sunucu Ekle`**
 
@@ -101,65 +125,7 @@ Formun **Sunucu Otomasyon Bilgileri** bölümünü doldurun:
 Formun üst kısmındaki **Hostname** alanı yalnızca sizin için bir etikettir — modül bağlanmak için onu
 değil **IP Adresi** alanını kullanır. Sunucularınız liste ekranında bu etiketle görünür.
 
-Kolayca gözden kaçan dört ayrıntı:
-
-- **Port alanı kilitlidir.** Yanındaki **Standart Portu Değiştir** kutusunu işaretlemeden port
-  yazamazsınız. Kutu işaretsizken alan modülün varsayılanını gösterir: SSL kapalıyken `2086`, **SSL ile
-  Bağlan**'ı işaretlediğinizde `2087`. cPanel için bu kadarı yeter — SSL'i işaretleyin, port kendiliğinden
-  2087 olur. **Plesk için `8443` girmeniz gerekir**, yani o kutuyu işaretlemek zorundasınız.
-- **Kimlik bilgisi her iki panelde de Şifre alanına yazılır.** WiseCP bu alanı şifreli saklar. Bu modül
-  **Erişim Anahtarı (Access Hash)** alanını hiç kullanmaz; alan DNAHosting sunucularında formda zaten
-  görünmez.
-- **Port yalnızca hangi panelin önce denendiğini belirler.** `8443`/`8880` girildiğinde önce Plesk,
-  diğer her değerde önce cPanel denenir — ama karar her zaman gerçek bir API çağrısıyla verilir ve ilk
-  tahmin yanıt vermezse diğerine geçilir. Yanlış port tespiti yavaşlatır, bozmaz.
-- **`Bağlantıyı Sına`** butonu formu kaydetmeden denemenizi sağlar. Kaydettiğinizde WiseCP zaten
-  otomatik bir bağlantı testi çalıştırır. Yeşil sonuç hem kimlik bilgisini hem tespit edilen paneli
-  doğrular; hata durumunda somut HTTP kodu ya da panel hatası gösterilir — bkz.
-  [Sorun giderme](#sorun-giderme).
-
----
-
-## cPanel WHM API token'ı — gereken ACL'ler
-
-Şifre alanına koyduğunuz token, onu üreten bayi hesabına verilmiş ACL'lerin ötesine asla geçemez.
-Token'ı üretmeden önce o bayinin ACL listesinde şunların açık olduğundan emin olun:
-
-```
-list-accts
-acct-summary
-create-acct
-suspend-acct
-kill-acct
-passwd
-upgrade-account
-list-pkgs
-show-bandwidth
-create-user-session
-```
-
-Token'ın kendisini, **o bayi olarak giriş yapmışken** **WHM → Development → Manage API Tokens**
-üzerinden üretin. cPanel'in kendi arayüzünden (WHM'den değil) üretilen bir token, hesabın ACL'leri ne
-olursa olsun WHM erişimi taşımaz.
-
----
-
-## Plesk API anahtarı — herkesin takıldığı yer
-
-Bir Plesk API anahtarı **üretildiği IP adresine bağlıdır.** Anahtarı kendi bilgisayarınızda üretir ya
-da başka bir sunucudan kopyalarsanız, WiseCP sunucunuz onu kullanmaya kalktığı anda kimlik doğrulama
-başarısız olur. Bu hata **`Plesk (11003)`** olarak raporlanır.
-
-Anahtarı **Plesk sunucusunun kendisinde**, WiseCP'nin bağlanacağı adres için (WiseCP sunucusunun dışa
-çıkan IP'si — panelin kendi IP'si değil) **Tools & Settings → API keys** üzerinden üretin.
-
-Bu zahmetliyse anahtarı tümüyle atlayın ve bayi hesabınızın **panel şifresini** Şifre alanına yazın.
-Modül kimlik bilgisini önce API anahtarı olarak dener; tutmazsa kendiliğinden HTTP basic auth'a düşer.
-Hangisini kullandığınızı ona söylemeniz gerekmez.
-
----
-
-## Sunucu grupları (isteğe bağlı)
+### Adım 2 — Sunucu grupları (isteğe bağlı)
 
 Birden fazla sunucunuz varsa **Paylaşımlı Sunucu Ayarları → `Sunucu Grupları`** altında grup
 oluşturup ürünü tek bir sunucu yerine gruba bağlayabilirsiniz. Grup düzenleme ekranında iki dağıtım
@@ -170,13 +136,12 @@ türü var:
 
 Sunucular **Atanmamış → Atanmış** listeleri arasında `Ekle` / `Kaldır` ile taşınır.
 
+> [!IMPORTANT]
 > **Grubu panel bazında homojen tutun.** Ürün formundaki paket listesi o an seçili olan **tek bir**
 > sunucudan çekilir. Bir grupta hem cPanel hem Plesk sunucusu varsa seçtiğiniz paket adı diğer panelde
 > karşılık bulmayabilir ve o sunucuya düşen sipariş "paket bulunamadı" ile başarısız olur.
 
----
-
-## Ürünü tanımlama
+### Adım 3 — Ürünü tanımlama
 
 **Ürünler / Hizmetler → Hosting/Sunucu → Web Hosting Paketleri** → paketi açın → **Modül Ayarları**
 sekmesi.
@@ -205,7 +170,7 @@ sipariş verildiğinde tam hesap açma akışı yapılandırdığınız sunucuya
 
 | Belirti | Sebep | Çözüm |
 |---|---|---|
-| Bir çağrı (çoğunlukla bağlantı testi) `HTTP 403` ile düşüyor ya da hata metninde `cpanelresult` zarfı geçiyor | Token'ın arkasındaki bayi hesabının o fonksiyon için WHM düzeyinde yetkisi yok; WHM, WHM API 1 yerine cPanel **kullanıcı** API'siyle yanıt verdi | WHM'de **Resellers → Edit Reseller's ACL List**'i açıp yukarıdaki ACL'leri verin, ardından token'ı **WHM → Development → Manage API Tokens**'tan o bayi olarak yeniden üretin |
+| Bir çağrı (çoğunlukla bağlantı testi) `HTTP 403` ile düşüyor ya da hata metninde `cpanelresult` zarfı geçiyor | Token'ın arkasındaki bayi hesabının o fonksiyon için WHM düzeyinde yetkisi yok; WHM, WHM API 1 yerine cPanel **kullanıcı** API'siyle yanıt verdi | WHM'de **Resellers → Edit Reseller's ACL List**'i açıp bayiye modülün kullandığı yetkileri verin: hesap listeleme ve özeti, hesap oluşturma, askıya alma, sonlandırma, şifre değiştirme, paket yükseltme, paket listeleme, trafik okuma ve oturum oluşturma. Ardından token'ı, **o bayi olarak giriş yapmışken** **WHM → Development → Manage API Tokens**'tan yeniden üretin — cPanel arayüzünden üretilen token WHM erişimi taşımaz |
 | `Plesk (11003)` | API anahtarı, WiseCP'nin bağlandığı IP'den başka bir adres için üretilmiş | Doğru IP için Plesk sunucusunda yeni anahtar üretin ya da Şifre alanına panel şifresini yazın |
 | `Plesk (1014)` | Plesk istek gövdesini reddetti — bir eleman eksik ya da bu sunucunun konuştuğu XML-API sürümü için yanlış yerde | Modülün güncel sürümünü kullandığınızı doğrulayın; modül logu Plesk'in tam olarak hangi elemana itiraz ettiğini gösterir |
 | Ürün formunda paket listesi yerine hata metni | Tespit ya da paket çağrısı başarısız oldu; sebep aynı satırda yazılıdır | Metindeki somut hataya göre yukarıdaki satırlardan birini uygulayın |
@@ -223,8 +188,15 @@ Modülün gönderdiği her istek ve aldığı her yanıt, işlem adıyla (örne�
 etiketlenerek buraya yazılır. Kayıt yalnızca **Modül İşlem Kayıtları** özelliği açıkken tutulur; o
 anahtar aynı sayfanın üst kısmındadır.
 
-Sunucunun API token'ı/şifresi, modülün ürettiği ya da değiştirdiği hesap şifreleri ve SSO oturum
-jetonları — hem istekte hem yanıtta — yazılmadan önce `***` ile maskelenir.
+> [!NOTE]
+> Sunucunun API token'ı/şifresi, modülün ürettiği ya da değiştirdiği hesap şifreleri ve SSO oturum
+> jetonları — hem istekte hem yanıtta — yazılmadan önce `***` ile maskelenir.
+
+---
+
+## Değişiklik günlüğü
+
+Sürüm sürüm değişiklikler için [CHANGELOG.md](CHANGELOG.md) dosyasına bakın.
 
 ---
 
