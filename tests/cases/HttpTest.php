@@ -89,3 +89,10 @@ test('summarise HTMLi temizler ve kirpar', function () {
     assertSame(13, strlen($long), 'kirpilan metin ... ile bitmeli');
     assertContains('...', $long);
 });
+
+test('summarise gecersiz UTF-8 bayt dizisini degradeli sekilde isler', function () {
+    $invalidUtf8 = "Bir\xC3\x28iki";
+    $result = DNAHosting_Http::summarise($invalidUtf8, 300);
+    assertTrue(is_string($result), 'sonuc string olmali');
+    assertTrue(strlen($result) > 0, 'sonuc bos olmamali');
+});

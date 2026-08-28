@@ -61,7 +61,7 @@ class DNAHosting_Http
             . ($body !== null && $body !== '' ? "\n\n" . $this->stringify($body) : ''));
 
         if (!empty($result['error'])) {
-            $this->log($action, $logRequest, 'TASIMA HATASI: ' . $result['error']);
+            $this->log($action, $logRequest, $this->mask('TASIMA HATASI: ' . $result['error']));
             throw new DNAHosting_Exception($result['error']);
         }
 
@@ -81,7 +81,8 @@ class DNAHosting_Http
     {
         $text = strip_tags((string) $body);
         $text = html_entity_decode($text, ENT_QUOTES, 'UTF-8');
-        $text = trim(preg_replace('/\s+/u', ' ', $text));
+        $replaced = preg_replace('/\s+/u', ' ', $text);
+        $text = trim($replaced === null ? $text : $replaced);
         if ($text === '') {
             return '';
         }

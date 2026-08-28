@@ -55,7 +55,7 @@ function assertThrows(callable $fn, $expectedMessageSubstring, $msg = '')
 {
     try {
         $fn();
-    } catch (Throwable $e) {
+    } catch (Exception $e) {
         assertContains($expectedMessageSubstring, $e->getMessage(), $msg);
         return $e;
     }
