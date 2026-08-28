@@ -569,7 +569,9 @@ git commit -m "feat: HTTP tasima katmani — govde ozeti, maskeleme, yonlendirme
 
 ### Task 3: `DNAHosting_Cpanel` — çağrı katmanı, bağlantı testi, paketler
 
-WHMCS portunda burada üç ayrı hata yaşandı: `cpanelresult` zarfı tanınmıyordu (reseller'ın WHM erişimi yokken anlamsız hata çıkıyordu), `myprivs` yanıtında `data.privileges[0]` yerine `data.privileges` okunuyordu (tüm ACL'ler eksik görünüyordu), ve okuma çağrıları POST ile gidiyordu. Üçü de testle sabitleniyor.
+WHMCS portunda burada iki ayrı hata yaşandı: `cpanelresult` zarfı tanınmıyordu (reseller'ın WHM erişimi yokken anlamsız hata çıkıyordu), ve okuma çağrıları POST ile gidiyordu. İkisi de testle sabitleniyor.
+
+WHMCS'teki üçüncü hata — `myprivs` yanıtında `data.privileges[0]` yerine `data.privileges` okunması — bu modülde **yeniden üretilmiyor, çünkü `myprivs` hiç çağrılmıyor.** O parse'ın hizmet ettiği ihtiyaç (reseller'ın WHM yetkisi yok, ACL'lere bakılmalı) burada daha sağlam bir mekanizmayla karşılanıyor: `unwrap()` `cpanelresult` zarfını gördüğü anda doğrudan ACL kontrolünü söyleyen bir mesaj veriyor.
 
 **Files:**
 - Create: `coremio/modules/Servers/DNAHosting/lib/Cpanel.php`
