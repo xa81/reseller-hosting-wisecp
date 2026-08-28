@@ -5,6 +5,24 @@ class DNAHosting_Module extends ServerModule
 {
     public $force_setup = false;
 
+    /**
+     * Bizim kimlik anahtarimiz config.user'dir; cekirdegin varsayilani "vm_id".
+     *
+     * ServerModule::edit_order_params() sonunda su kontrol var (Modules.php:445):
+     *     if (!isset($options["config"][$this->entity_id_name]) || !...) {
+     *         unset($options["config"]); unset($options["established"]);
+     *     }
+     * Varsayilan "vm_id" birakilsaydi admin "Siparis Otomasyonu" ekranindan yapilan
+     * her kayit config'i silerdi; panelUser() config.user'a bagli oldugu icin askiya
+     * alma, sonlandirma, sifre degistirme, kullanim ve SSO kalici olarak
+     * "error-no-order" verirdi. Alanin cekirdekte baska kullanimi yok (tek yer: 445).
+     *
+     * config.user'i cekirdek createAccount donusunden kendisi yaziyor
+     * (helpers/orders.php:2849), yani "kurulmus hizmet" ile "config.user var"
+     * ayni sey — guard da tam bunu olcmus oluyor.
+     */
+    public $entity_id_name = 'user';
+
     private $panel     = null;
     private $drivers   = array();
     private $transport = null;
@@ -563,6 +581,38 @@ class DNAHosting_Module extends ServerModule
             $this->lang['error-domain-change-plesk']
         );
         return false;
+    }
+
+    /**
+     * Admin "Siparis Otomasyonu" kaydinda config ve creation_info'yu korur.
+     *
+     * ServerModule::edit_order_params() bu ikisini POST'tan (int) olarak okuyor
+     * (Modules.php:421-422), yani gercek dizi degerleri kaybolur. Bu kanca tanimliysa
+     * cekirdek bizim donusumuzu kullanir (Modules.php:423-435). Modulun admin tarafinda
+     * kendine ait bir servis alani formu yok — dolayisiyla dogru davranis, mevcut
+     * degerleri OLDUGU GIBI geri vermektir.
+     *
+     * Cekirdek bu kancayi iki ayri sekille cagirabiliyor: duz "creation_info"/"config"
+     * (Modules.php:423) ve "old"/"new" (Modules.php:515). Ikincisi
+     * ServerModule::apply_options() icindedir; onu ezdigimiz icin bize gelmez, yine de
+     * sekli desteklenir.
+     */
+    public function save_adminArea_service_fields($data = array())
+    {
+        if (isset($data['new']) && is_array($data['new'])) {
+            return $data['new'];
+        }
+
+        $options = is_array($this->options) ? $this->options : array();
+
+        return array(
+            'creation_info' => isset($options['creation_info']) && is_array($options['creation_info'])
+                ? $options['creation_info']
+                : array(),
+            'config' => isset($options['config']) && is_array($options['config'])
+                ? $options['config']
+                : array(),
+        );
     }
 
     public function apply_options($old_options, $new_options = array())
