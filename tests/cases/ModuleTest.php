@@ -68,8 +68,16 @@ test('Modul getPlans hata durumunda false doner', function () {
 
 class DNAHosting_ModuleRouting extends DNAHosting_Module
 {
+    public $admin = false;
+
     public function use_clientArea_SingleSignOn() { return 'client'; }
     public function use_adminArea_SingleSignOn() { return 'admin'; }
+    public function use_clientArea_change_password() { return 'sifre-degistirildi'; }
+
+    protected function isAdminArea()
+    {
+        return $this->admin;
+    }
 }
 
 test('Modul use_method musteri onekini kullanir', function () {
@@ -82,4 +90,16 @@ test('Modul use_method bilinmeyen metodu yok sayar', function () {
     $m = new DNAHosting_ModuleRouting(false);
     assertSame(null, $m->use_method('YokBoyleBirSey'));
     assertSame(null, $m->use_method(''));
+});
+
+test('Modul use_method admin onekini kullanir', function () {
+    // ADMINISTRATOR sabitini tanimlamadan admin dalini sinamak icin isAdminArea() ezildi.
+    $m = new DNAHosting_ModuleRouting(false);
+    $m->admin = true;
+    assertSame('admin', $m->use_method('SingleSignOn'));
+});
+
+test('Modul use_method tire donusumunu uygular', function () {
+    $m = new DNAHosting_ModuleRouting(false);
+    assertSame('sifre-degistirildi', $m->use_method('change-password'));
 });

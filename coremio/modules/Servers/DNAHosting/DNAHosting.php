@@ -111,7 +111,7 @@ class DNAHosting_Module extends ServerModule
             }
             $value = $cache->retrieve($key);
             return is_array($value) ? $value : null;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return null;
         }
     }
@@ -124,7 +124,7 @@ class DNAHosting_Module extends ServerModule
         try {
             $cache = new Cache('dnahosting');
             $cache->store($key, $value, 604800);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             // Onbellek saf optimizasyon; lisans alan adi tutmazsa sessizce iskalar.
         }
     }
@@ -157,10 +157,16 @@ class DNAHosting_Module extends ServerModule
         }
     }
 
+    /** Ayri bir metoda cikarildi: testler ADMINISTRATOR sabitini tanimlamadan admin dalini sinayabilsin diye. */
+    protected function isAdminArea()
+    {
+        return defined('ADMINISTRATOR');
+    }
+
     public function use_method($param = '')
     {
         $param  = str_replace('-', '_', $param);
-        $prefix = defined('ADMINISTRATOR') ? 'use_adminArea_' : 'use_clientArea_';
+        $prefix = $this->isAdminArea() ? 'use_adminArea_' : 'use_clientArea_';
         if ($param === '') {
             return null;
         }

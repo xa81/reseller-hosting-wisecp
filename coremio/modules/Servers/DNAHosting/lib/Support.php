@@ -37,6 +37,10 @@ class DNAHosting_Support
 
     public static function password($length = 14)
     {
+        if ($length < 4) {
+            $length = 4;
+        }
+
         $lower  = 'abcdefghijkmnpqrstuvwxyz';
         $upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
         $digit  = '23456789';
