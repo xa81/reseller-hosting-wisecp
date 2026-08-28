@@ -100,9 +100,21 @@ test('Detector onbellek yazamasa bile calisir', function () {
     ));
     $d->setCache(
         function ($key) { return null; },
-        function ($key, $value) { throw new Exception('lisans alan adi tutmuyor'); }
+        function ($key, $value) { throw new TypeError('lisans alan adi tutmuyor'); }
     );
     assertSame('cpanel', $d->detect()['panel'], 'onbellek hatasi tespiti bozmamali');
+});
+
+test('Detector onbellekten okumasa bile calisir', function () {
+    list($d, $seen) = dna_detector(2087, array(
+        'cpanel' => new DNAHosting_FakeDriver(true),
+        'plesk'  => new DNAHosting_FakeDriver(true),
+    ));
+    $d->setCache(
+        function ($key) { throw new TypeError('lisans alan adi tutmuyor'); },
+        function ($key, $value) { }
+    );
+    assertSame('cpanel', $d->detect()['panel'], 'onbellek okuma hatasi tespiti bozmamali');
 });
 
 test('Detector anahtari kimlik bilgisi degisince degisir', function () {

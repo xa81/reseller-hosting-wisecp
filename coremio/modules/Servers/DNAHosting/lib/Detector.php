@@ -54,7 +54,8 @@ class DNAHosting_Detector
         }
 
         $failures = array();
-        foreach (self::order($this->server['port']) as $panel) {
+        $port = isset($this->server['port']) ? $this->server['port'] : 0;
+        foreach (self::order($port) as $panel) {
             $driver = call_user_func($this->factory, $panel);
             try {
                 $driver->testConnection();
@@ -83,7 +84,7 @@ class DNAHosting_Detector
         }
         try {
             $value = call_user_func($this->cacheGet, $key);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return null;
         }
         return is_array($value) ? $value : null;
@@ -96,7 +97,7 @@ class DNAHosting_Detector
         }
         try {
             call_user_func($this->cacheSet, $key, $value);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             // Onbellek saf optimizasyondur; yazilamamasi tespiti bozmaz.
         }
     }
