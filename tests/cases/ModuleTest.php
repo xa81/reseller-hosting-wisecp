@@ -286,6 +286,32 @@ test('Modul change_plan bos plani sessizce gecer', function () {
     assertSame(0, count($t->calls));
 });
 
+/** testConnection gecer ama islem sirasinda Exception TUREVI OLMAYAN bir hata firlatir. */
+class DNAHosting_ExplodingDriver
+{
+    public function testConnection() { return true; }
+    public function authMode() { return 'key'; }
+    public function suspendAccount($username, $reason = '') { throw new TypeError('surucu patladi'); }
+}
+
+class DNAHosting_ModuleExploding extends DNAHosting_ModuleWithNeighbours
+{
+    public function driverFor($panel) { return new DNAHosting_ExplodingDriver(); }
+}
+
+test('Modul surucuden gelen Throwable i de $this->error e cevirir', function () {
+    // TypeError bir Exception degildir. Yalnizca Exception yakalanirsa WiseCP'ye
+    // fatal olarak kacar; kullanici bos bir hata gorur ve islem "failed" bile olmaz.
+    $m = new DNAHosting_ModuleExploding(array(
+        'id' => 3, 'name' => 'test', 'ip' => '1.2.3.4', 'port' => 2087, 'secure' => 1,
+        'username' => 'bayi', 'password' => 'GIZLI123456',
+    ));
+    $m->order          = array('id' => 501, 'owner_id' => 7);
+    $m->config['user'] = 'ornek1';
+    assertSame(false, $m->suspend());
+    assertContains('surucu patladi', $m->error);
+});
+
 test('Modul apply_updowngrade eski creation_info yerine yeni urunun planini uygular', function () {
     // Cekirdek bu cagriyi ESKI siparis secenekleriyle yapar (orders.php:3070-3076) ve
     // creation_info'yu ancak modul donduktun SONRA tazeler (orders.php:254-255).

@@ -62,7 +62,9 @@ class DNAHosting_Http
 
         if (!empty($result['error'])) {
             $this->log($action, $logRequest, $this->mask('TASIMA HATASI: ' . $result['error']));
-            throw new DNAHosting_Exception($result['error']);
+            // Mesaj $this->error e, oradan admin arayuzune ve openPanel() uzerinden
+            // musterinin tarayicisina kadar gidiyor; log gibi o da maskelenmeli.
+            throw new DNAHosting_Exception($this->mask($result['error']));
         }
 
         $status = (int) $result['status'];
@@ -71,7 +73,7 @@ class DNAHosting_Http
 
         if ($status >= 400) {
             $summary = self::summarise($rbody);
-            throw new DNAHosting_Exception('HTTP ' . $status . ($summary ? ': ' . $summary : ''));
+            throw new DNAHosting_Exception($this->mask('HTTP ' . $status . ($summary ? ': ' . $summary : '')));
         }
 
         return array('status' => $status, 'body' => $rbody);
@@ -86,7 +88,13 @@ class DNAHosting_Http
         if ($text === '') {
             return '';
         }
-        if (strlen($text) > $limit) {
+        // Bayt bazli kirpma cok baytli bir karakterin ortasindan gecip bozuk UTF-8
+        // uretebilir; bu metin sonra hata mesaji olarak sayfaya ciziliyor.
+        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+            if (mb_strlen($text, 'UTF-8') > $limit) {
+                $text = mb_substr($text, 0, $limit, 'UTF-8') . '...';
+            }
+        } elseif (strlen($text) > $limit) {
             $text = substr($text, 0, $limit) . '...';
         }
         return $text;

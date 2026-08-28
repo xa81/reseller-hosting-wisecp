@@ -126,3 +126,20 @@ test('Detector anahtari kimlik bilgisi degisince degisir', function () {
     assertSame(DNAHosting_Detector::cacheKey($a), DNAHosting_Detector::cacheKey($a));
     assertSame(false, strpos(DNAHosting_Detector::cacheKey($a), 'p1'), 'anahtar sifreyi acikca tasimamali');
 });
+
+/** testConnection Exception turevi olmayan bir hata firlatir. */
+class DNAHosting_ProbeExploder
+{
+    public function testConnection() { throw new TypeError('probe patladi'); }
+}
+
+test('Detector probe sirasindaki Throwable i de yakalar', function () {
+    $detector = new DNAHosting_Detector(
+        array('ip' => '1.2.3.4', 'port' => 2087, 'username' => 'u', 'password' => 'p'),
+        function ($panel) { return new DNAHosting_ProbeExploder(); }
+    );
+    $e = assertThrows(function () use ($detector) {
+        $detector->detect();
+    }, 'ne cPanel ne Plesk');
+    assertContains('probe patladi', $e->getMessage(), 'somut sebep raporlanmali');
+});

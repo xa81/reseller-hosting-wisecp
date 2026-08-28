@@ -82,6 +82,36 @@ test('Http zaman asimi tasiyiciya gecer', function () {
     assertSame(400, $t->lastCall()['timeout']);
 });
 
+test('Http HTTP hatasi mesajinda da gizli dizeleri maskeler', function () {
+    // Loga giden her sey mask()ten geciyordu ama istisnaya konan sey gecmiyordu.
+    // O mesaj $this->error e, admin arayuzune ve openPanel() uzerinden musterinin
+    // tarayicisina kadar gidiyor.
+    list($h, $t) = dna_http();
+    $h->addSecret('SUPERGIZLITOKEN');
+    $t->push(403, 'Access denied for SUPERGIZLITOKEN');
+    $e = assertThrows(function () use ($h) {
+        $h->send('GET', '/x', array(), null, 'test');
+    }, '***');
+    assertSame(false, strpos($e->getMessage(), 'SUPERGIZLITOKEN'));
+});
+
+test('Http tasima hatasi mesajinda da gizli dizeleri maskeler', function () {
+    list($h, $t) = dna_http();
+    $h->addSecret('SUPERGIZLITOKEN');
+    $t->pushError('Could not connect with SUPERGIZLITOKEN');
+    $e = assertThrows(function () use ($h) {
+        $h->send('GET', '/x', array(), null, 'test');
+    }, '***');
+    assertSame(false, strpos($e->getMessage(), 'SUPERGIZLITOKEN'));
+});
+
+test('summarise cok baytli karakteri ortadan kesmez', function () {
+    // Bayt bazli kirpma bozuk UTF-8 uretir ve o metin sonra sayfaya ciziliyor.
+    $out = DNAHosting_Http::summarise(str_repeat('ö', 20), 11);
+    assertContains('...', $out);
+    assertSame(true, mb_check_encoding($out, 'UTF-8'), 'gecerli UTF-8 olmali');
+});
+
 test('summarise HTMLi temizler ve kirpar', function () {
     $out = DNAHosting_Http::summarise('<html>  <b>Bir</b>   <i>iki</i>  </html>', 300);
     assertSame('Bir iki', $out);

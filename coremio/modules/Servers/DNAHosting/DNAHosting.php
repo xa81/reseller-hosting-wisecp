@@ -129,7 +129,14 @@ class DNAHosting_Module extends ServerModule
         }
     }
 
-    private function failed(Exception $e)
+    /**
+     * Surucu istisnasini WiseCP sozlesmesine cevirir: $this->error + false.
+     *
+     * Exception degil Throwable alir. Bir surucuden gelen TypeError Exception turevi
+     * degildir; yalnizca Exception yakalanirsa WiseCP'ye fatal olarak kacar, kullanici
+     * bos bir hata gorur ve islem "failed" olarak bile kaydedilmez.
+     */
+    private function failed(Throwable $e)
     {
         $this->error = $e->getMessage();
         return false;
@@ -140,7 +147,7 @@ class DNAHosting_Module extends ServerModule
         try {
             $this->panel();
             return true;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return $this->failed($e);
         }
     }
@@ -152,7 +159,7 @@ class DNAHosting_Module extends ServerModule
                 return $this->driver()->listPlans();
             }
             return $this->driver()->listPackages();
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return $this->failed($e);
         }
     }
@@ -185,7 +192,7 @@ class DNAHosting_Module extends ServerModule
     {
         try {
             $panel = $this->panel();
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             // Panel tespiti basarisiz oldu; sessizce cPanel kurallarina duser (8 karakter,
             // harfle basla, [a-z0-9]) — bu kurallara uyan bir ad Plesk icin de gecerlidir,
             // bu yuzden dogru panel sonradan belirlense bile ad reddedilmez. Bu bir
@@ -283,7 +290,7 @@ class DNAHosting_Module extends ServerModule
                     'port'     => 21,
                 ),
             );
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return $this->failed($e);
         }
     }
@@ -360,7 +367,7 @@ class DNAHosting_Module extends ServerModule
                 return $this->driver()->suspend($t['webspace_id']);
             }
             return $this->driver()->suspendAccount($this->panelUser(), 'WiseCP');
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return $this->failed($e);
         }
     }
@@ -373,7 +380,7 @@ class DNAHosting_Module extends ServerModule
                 return $this->driver()->unsuspend($t['webspace_id']);
             }
             return $this->driver()->unsuspendAccount($this->panelUser());
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return $this->failed($e);
         }
     }
@@ -381,7 +388,9 @@ class DNAHosting_Module extends ServerModule
     public function suspend_reseller()   { return $this->suspend(); }
     public function unsuspend_reseller() { return $this->unsuspend(); }
     public function removeReseller($user = false) { return $this->removeAccount($user); }
+    /** Cekirdekte cagri yeri yok; bayi hesabi satmiyoruz. Niyeti belgelemek icin duruyor. */
     public function setReseller($user, $params = array())   { return true; }
+    /** Cekirdekte cagri yeri yok; bayi hesabi satmiyoruz. Niyeti belgelemek icin duruyor. */
     public function setupReseller($user = false, $params = array()) { return true; }
 
     public function removeAccount($user = false)
@@ -403,7 +412,7 @@ class DNAHosting_Module extends ServerModule
                 return $this->driver()->terminate($t['webspace_id'], $t['customer_id'], $this->externalId());
             }
             return $this->driver()->terminateAccount($user ? $user : $this->panelUser());
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return $this->failed($e);
         }
     }
@@ -463,7 +472,7 @@ class DNAHosting_Module extends ServerModule
                 return $this->driver()->changePassword($t['customer_id'], $t['webspace_id'], $newpw);
             }
             return $this->driver()->changePassword($this->panelUser(), $newpw);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return $this->failed($e);
         }
     }
@@ -479,7 +488,7 @@ class DNAHosting_Module extends ServerModule
                 return $this->driver()->changePlan($t['webspace_id'], $this->driver()->resolvePlan($plan));
             }
             return $this->driver()->changePackage($this->panelUser(), $plan);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return $this->failed($e);
         }
     }
@@ -638,7 +647,7 @@ class DNAHosting_Module extends ServerModule
     {
         try {
             $usage = $this->usageSnapshot();
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return $this->failed($e);
         }
 
@@ -664,6 +673,7 @@ class DNAHosting_Module extends ServerModule
         return $this->usageBlock('bw_used', 'bw_limit');
     }
 
+    /** Cekirdekte cagri yeri yok (tasarim §3.3 spekulatif listeliyor); goruntuleme yardimcisi. */
     public function getSummary()
     {
         if (!isset($this->config['user']) || $this->config['user'] === '') {
@@ -674,7 +684,7 @@ class DNAHosting_Module extends ServerModule
         try {
             $panel = $this->panel();
             $summary['panel'] = $panel === 'plesk' ? $this->lang['panel-plesk'] : $this->lang['panel-cpanel'];
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             // Bu bir goruntuleme yardimcisidir: panel tespiti basarisiz olursa
             // yanlis bir etiket uydurmak yerine 'panel' alani sessizce atlanir.
             // $this->error kasitli olarak set edilmez.
@@ -699,7 +709,7 @@ class DNAHosting_Module extends ServerModule
             } else {
                 $url = $this->driver()->createSession($this->panelUser(), $service, self::clientIp());
             }
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $this->failed($e);
             echo htmlspecialchars($this->error, ENT_QUOTES, 'UTF-8');
             return false;
@@ -749,7 +759,7 @@ class DNAHosting_Module extends ServerModule
     {
         try {
             $panel = $this->panel();
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             // Goruntuleme yardimcisi: panel tespit edilemezse sablona bos birakilir,
             // hata firlatilmaz ve $this->error kasitli olarak set edilmez.
             $panel = '';

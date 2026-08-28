@@ -59,7 +59,10 @@ class DNAHosting_Detector
             $driver = call_user_func($this->factory, $panel);
             try {
                 $driver->testConnection();
-            } catch (Exception $e) {
+            } catch (Throwable $e) {
+                // Exception degil Throwable: bir surucuden gelen TypeError de
+                // "bu panel yanit vermedi" demektir, WiseCP'ye kacan bir fatal degil.
+                // readCache/writeCache zaten Throwable yakaliyor.
                 $failures[] = strtoupper($panel) . ': ' . $e->getMessage();
                 continue;
             }
