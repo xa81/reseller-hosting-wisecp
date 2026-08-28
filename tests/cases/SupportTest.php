@@ -30,3 +30,17 @@ test('domainKey normalize eder', function () {
     assertSame('ornek.com', DNAHosting_Support::domainKey('  ORNEK.com.  '));
     assertSame('ornek.com', DNAHosting_Support::domainKey('Ornek.Com'));
 });
+
+test('formatBytes okunabilir cikti verir', function () {
+    assertSame('∞', DNAHosting_Support::formatBytes(0));
+    assertSame('1 KB', DNAHosting_Support::formatBytes(1024));
+    assertSame('1 MB', DNAHosting_Support::formatBytes(1048576));
+    assertSame('1.5 GB', DNAHosting_Support::formatBytes(1610612736));
+});
+
+test('percent sinirli araliga kilitler', function () {
+    assertSame(50, DNAHosting_Support::percent(512, 1024));
+    assertSame(0, DNAHosting_Support::percent(512, 0));
+    assertSame(100, DNAHosting_Support::percent(4096, 1024));
+    assertSame(0, DNAHosting_Support::percent(0, 1024));
+});

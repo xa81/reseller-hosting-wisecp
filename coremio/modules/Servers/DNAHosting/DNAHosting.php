@@ -477,4 +477,137 @@ class DNAHosting_Module extends ServerModule
 
         return $new_options;
     }
+
+    public function usageSnapshot()
+    {
+        if (isset($this->storage['usage'])) {
+            return $this->storage['usage'];
+        }
+
+        if ($this->panel() === 'plesk') {
+            $t     = $this->pleskTargets();
+            $usage = $this->driver()->usage($t['webspace_id']);
+        } else {
+            $usage = $this->driver()->usage($this->panelUser());
+        }
+
+        $this->storage['usage'] = $usage;
+        return $usage;
+    }
+
+    private function usageBlock($usedKey, $limitKey)
+    {
+        try {
+            $usage = $this->usageSnapshot();
+        } catch (Exception $e) {
+            return $this->failed($e);
+        }
+
+        $used  = (int) $usage[$usedKey];
+        $limit = (int) $usage[$limitKey];
+
+        return array(
+            'limit'        => $limit,
+            'used'         => $used,
+            'used-percent' => DNAHosting_Support::percent($used, $limit),
+            'format-limit' => DNAHosting_Support::formatBytes($limit),
+            'format-used'  => $used > 0 ? DNAHosting_Support::formatBytes($used) : '0 KB',
+        );
+    }
+
+    public function getDisk()
+    {
+        return $this->usageBlock('disk_used', 'disk_limit');
+    }
+
+    public function getBandwidth($user = false)
+    {
+        return $this->usageBlock('bw_used', 'bw_limit');
+    }
+
+    public function getSummary()
+    {
+        if (!isset($this->config['user']) || $this->config['user'] === '') {
+            return false;
+        }
+        return array(
+            'panel'  => $this->panel === 'plesk' ? $this->lang['panel-plesk'] : $this->lang['panel-cpanel'],
+            'domain' => $this->orderDomain(),
+        );
+    }
+
+    private static function clientIp()
+    {
+        if (class_exists('UserManager') && method_exists('UserManager', 'GetIP')) {
+            $ip = UserManager::GetIP();
+            return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '';
+        }
+        return isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
+    }
+
+    private function openPanel($service)
+    {
+        try {
+            if ($this->panel() === 'plesk') {
+                $url = $this->driver()->createSession($this->panelUser(), self::clientIp());
+            } else {
+                $url = $this->driver()->createSession($this->panelUser(), $service, self::clientIp());
+            }
+        } catch (Exception $e) {
+            $this->failed($e);
+            echo htmlspecialchars($this->error, ENT_QUOTES, 'UTF-8');
+            return false;
+        }
+
+        if (class_exists('Utility') && method_exists('Utility', 'redirect')) {
+            Utility::redirect($url);
+        } else {
+            header('Location: ' . $url);
+        }
+        return true;
+    }
+
+    public function use_clientArea_SingleSignOn()
+    {
+        return $this->openPanel('cpaneld');
+    }
+
+    public function use_adminArea_SingleSignOn()
+    {
+        return $this->openPanel('cpaneld');
+    }
+
+    public function panel_links_for_client()
+    {
+        return array(
+            'panel' => array(
+                'url'   => $this->area_link . '?inc=use_method&method=SingleSignOn',
+                'color' => 'blue',
+                'icon'  => 'fa fa-sign-in',
+                'name'  => $this->lang['login-panel'],
+            ),
+        );
+    }
+
+    public function panel_links_for_admin()
+    {
+        return array(
+            'panel' => array(
+                'url'  => $this->area_link . '?operation=hosting_use_method&use_method=SingleSignOn',
+                'name' => $this->lang['login-panel'],
+            ),
+        );
+    }
+
+    public function clientArea()
+    {
+        $page = $this->page ? $this->page : 'home';
+        return $this->get_page('clientArea-' . $page, array(
+            'LANG'     => $this->lang,
+            'panel'    => $this->panel,
+            'username' => isset($this->config['user']) ? $this->config['user'] : '',
+            'domain'   => $this->orderDomain(),
+            'server'   => $this->server,
+        ));
+    }
 }

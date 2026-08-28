@@ -241,3 +241,67 @@ test('Modul apply_options kodlanmis sifreyi hem config hem ftp_info alaninda don
     assertSame('ENC:yenisifre123', $r['config']['password']);
     assertSame('ENC:yenisifre123', $r['ftp_info']['password']);
 });
+
+test('Modul getDisk WiseCP sozlesmesine uyar', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1",'
+            . '"diskused":"512M","disklimit":"1024M","totalbytes":"1048576","limit":"unlimited"}]}}');
+    });
+    $m->config['user'] = 'ornek1';
+    $d = $m->getDisk();
+    assertSame(536870912, $d['used']);
+    assertSame(1073741824, $d['limit']);
+    assertSame(50, $d['used-percent']);
+    assertSame('1 GB', $d['format-limit']);
+    assertSame('512 MB', $d['format-used']);
+});
+
+test('Modul getBandwidth sinirsizi sonsuz gosterir', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1",'
+            . '"diskused":"512M","disklimit":"1024M","totalbytes":"1048576","limit":"unlimited"}]}}');
+    });
+    $m->config['user'] = 'ornek1';
+    $b = $m->getBandwidth();
+    assertSame(0, $b['limit']);
+    assertSame('∞', $b['format-limit']);
+    assertSame(0, $b['used-percent']);
+});
+
+test('Modul kullanim verisini tek istekte bir kez ceker', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[{"user":"ornek1",'
+            . '"diskused":"512M","disklimit":"1024M","totalbytes":"1","limit":"1"}]}}');
+    });
+    $m->config['user'] = 'ornek1';
+    $m->getDisk();
+    $m->getBandwidth();
+    assertSame(2, count($t->calls), 'tespit + tek kullanim cagrisi bekleniyor');
+});
+
+test('Modul getDisk hatada false doner', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(403, 'Access denied');
+        $t->push(403, 'Access denied');
+    });
+    $m->config['user'] = 'ornek1';
+    assertSame(false, $m->getDisk());
+    assertContains('Access denied', $m->error);
+});
+
+test('Modul panel_links_for_client giris butonu verir', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) { });
+    $m->area_link = '/hizmet/501';
+    $links = $m->panel_links_for_client();
+    assertTrue(isset($links['panel']));
+    assertContains('use_method', $links['panel']['url']);
+    assertContains('SingleSignOn', $links['panel']['url']);
+});
+
+test('Modul root SSO metodu tanimlamaz', function () {
+    assertSame(false, method_exists('DNAHosting_Module', 'use_adminArea_root_SingleSignOn'),
+        'root erisimimiz yok, buton gosterilmemeli');
+});

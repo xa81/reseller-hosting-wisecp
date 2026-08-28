@@ -67,4 +67,34 @@ class DNAHosting_Support
         $domain = rtrim(trim((string) $domain), '.');
         return function_exists('mb_strtolower') ? mb_strtolower($domain, 'UTF-8') : strtolower($domain);
     }
+
+    public static function formatBytes($bytes)
+    {
+        $bytes = (float) $bytes;
+        if ($bytes <= 0) {
+            return '∞';
+        }
+
+        $units = array('B', 'KB', 'MB', 'GB', 'TB', 'PB');
+        $index = 0;
+        while ($bytes >= 1024 && $index < count($units) - 1) {
+            $bytes /= 1024;
+            $index++;
+        }
+
+        $rounded = round($bytes, 1);
+        $text    = ($rounded == (int) $rounded) ? (string) (int) $rounded : (string) $rounded;
+        return $text . ' ' . $units[$index];
+    }
+
+    public static function percent($used, $limit)
+    {
+        $used  = (float) $used;
+        $limit = (float) $limit;
+        if ($limit <= 0 || $used <= 0) {
+            return 0;
+        }
+        $percent = (int) round($used / $limit * 100);
+        return $percent > 100 ? 100 : $percent;
+    }
 }
