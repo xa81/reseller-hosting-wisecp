@@ -2737,9 +2737,22 @@ test('Modul getPlans hata durumunda false doner', function () {
     assertContains('Access denied', $m->error);
 });
 
+class DNAHosting_ModuleRouting extends DNAHosting_Module
+{
+    public function use_clientArea_SingleSignOn() { return 'client'; }
+    public function use_adminArea_SingleSignOn() { return 'admin'; }
+}
+
 test('Modul use_method musteri onekini kullanir', function () {
-    list($m, $t) = dna_module(2087, function ($t) { });
-    assertSame('clientArea:SingleSignOn', $m->use_method('SingleSignOn'));
+    // __CLASS__ derleme zamani sabiti oldugundan alt sinifta da _name 'DNAHosting_Module' kalir.
+    $m = new DNAHosting_ModuleRouting(false);
+    assertSame('client', $m->use_method('SingleSignOn'));
+});
+
+test('Modul use_method bilinmeyen metodu yok sayar', function () {
+    $m = new DNAHosting_ModuleRouting(false);
+    assertSame(null, $m->use_method('YokBoyleBirSey'));
+    assertSame(null, $m->use_method(''));
 });
 ```
 
@@ -2928,22 +2941,13 @@ class DNAHosting_Module extends ServerModule
 }
 ```
 
-`use_method` testinin geçmesi için sınıfa geçici bir sonda ekle (Task 11'de gerçek SSO ile değiştirilecek):
-
-```php
-    public function use_clientArea_SingleSignOn()
-    {
-        return 'clientArea:SingleSignOn';
-    }
-```
-
 - [ ] **Step 9: Testleri çalıştır, geçtiklerini gör**
 
 ```bash
 php tests/run.php
 ```
 
-Beklenen: `79 gecti, 0 kaldi`
+Beklenen: `80 gecti, 0 kaldi`
 
 - [ ] **Step 10: Commit**
 
@@ -3057,7 +3061,8 @@ test('Modul removeAccount ayni domainli komsu varsa reddeder', function () {
     $m->neighbours        = array(777);
     assertSame(false, $m->removeAccount());
     assertContains('777', $m->error);
-    assertSame(1, count($t->calls), 'silme istegi gonderilmemeli');
+    // Guard panel() cagrilmadan once firlar, bu yuzden hic HTTP istegi cikmaz.
+    assertSame(0, count($t->calls), 'hicbir istek gonderilmemeli');
 });
 
 test('Modul removeAccount komsu yoksa siler', function () {
@@ -3077,7 +3082,8 @@ test('Modul change_plan bos plani sessizce gecer', function () {
     });
     $m->config['user'] = 'ornek1';
     assertTrue($m->change_plan(''));
-    assertSame(1, count($t->calls));
+    // Bos plan panel() cagrilmadan true doner.
+    assertSame(0, count($t->calls));
 });
 
 test('Modul externalId siparis kimliginden turer', function () {
@@ -3104,7 +3110,7 @@ Beklenen: `Call to undefined method DNAHosting_Module::createAccount()`
 
 - [ ] **Step 3: Yaşam döngüsü metotlarını yaz**
 
-Task 9'da eklenen geçici `use_clientArea_SingleSignOn()` sondası **kalsın**; Task 11'de gerçeğiyle değiştirilecek. Aşağıdakileri sınıfa ekle:
+Aşağıdakileri sınıfa ekle:
 
 ```php
     public function externalId()
@@ -3398,7 +3404,7 @@ Task 9'da eklenen geçici `use_clientArea_SingleSignOn()` sondası **kalsın**; 
 php tests/run.php
 ```
 
-Beklenen: `88 gecti, 0 kaldi`
+Beklenen: `89 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -3565,7 +3571,7 @@ Beklenen: `Class "DNAHosting_Support" ... formatBytes()` tanımsız
 
 - [ ] **Step 4: Modülün kullanım ve SSO bölümünü yaz**
 
-Task 9'da eklenen geçici `use_clientArea_SingleSignOn()` sondasını **sil** ve şunları ekle:
+Aşağıdakileri sınıfa ekle (Task 9 geçici bir sonda bırakmadı — `DNAHosting_ModuleRouting` test alt sınıfı yönlendirmeyi kendi geçersiz kılmalarıyla ölçüyor, bu yüzden silinecek bir şey yok):
 
 ```php
     public function usageSnapshot()
@@ -3746,7 +3752,7 @@ Task 9'da eklenen geçici `use_clientArea_SingleSignOn()` sondasını **sil** ve
 php tests/run.php
 ```
 
-Beklenen: `96 gecti, 0 kaldi`
+Beklenen: `97 gecti, 0 kaldi`
 
 - [ ] **Step 7: Commit**
 
@@ -3914,7 +3920,7 @@ Beklenen: her dosya için `No syntax errors detected`
 php tests/run.php
 ```
 
-Beklenen: `96 gecti, 0 kaldi`
+Beklenen: `97 gecti, 0 kaldi`
 
 - [ ] **Step 6: Commit**
 
@@ -3958,7 +3964,7 @@ Beklenen: **hiçbir çıktı yok.** Çıktı veren her dosya guard'dan yoksundur
 php tests/run.php
 ```
 
-Beklenen: `96 gecti, 0 kaldi`
+Beklenen: `97 gecti, 0 kaldi`
 
 - [ ] **Step 4: `README.md` yaz**
 
