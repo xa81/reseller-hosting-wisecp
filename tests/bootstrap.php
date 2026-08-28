@@ -11,3 +11,4 @@ $moduleDir = dirname(__DIR__) . '/coremio/modules/Servers/DNAHosting/';
 require_once __DIR__ . '/support/FakeTransport.php';
 require_once $moduleDir . 'lib/Exception.php';
 require_once $moduleDir . 'lib/Http.php';
+require_once $moduleDir . 'lib/Cpanel.php';
