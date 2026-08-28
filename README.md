@@ -1,126 +1,129 @@
 # DNA Reseller Hosting
 
-**Sell cPanel/WHM and Plesk shared hosting from a single WiseCP server module.**
+**Tek WiseCP sunucu modülüyle hem cPanel/WHM hem Plesk üzerinden paylaşımlı hosting satın.**
 
-One module, two panels. Point it at a server and it figures out on its own whether that server
-runs cPanel/WHM or Plesk — you never set a panel type by hand.
+Bir modül, iki panel. Sunucuyu tanımlarsınız; modül o sunucunun cPanel/WHM mi Plesk mi çalıştırdığını
+**kendisi bulur** — hiçbir yerde panel tipi seçmezsiniz.
 
 ![WiseCP](https://img.shields.io/badge/WiseCP-self--hosted-4A90D9?style=flat-square)
 ![PHP](https://img.shields.io/badge/PHP-7.4%20%E2%80%93%208.4-777BB4?style=flat-square&logo=php&logoColor=white)
-![cPanel](https://img.shields.io/badge/cPanel%2FWHM-supported-FF6C2C?style=flat-square)
-![Plesk](https://img.shields.io/badge/Plesk-supported-53BCE6?style=flat-square)
-![License](https://img.shields.io/badge/license-proprietary-lightgrey?style=flat-square)
+![cPanel](https://img.shields.io/badge/cPanel%2FWHM-destekleniyor-FF6C2C?style=flat-square)
+![Plesk](https://img.shields.io/badge/Plesk-destekleniyor-53BCE6?style=flat-square)
+![Lisans](https://img.shields.io/badge/lisans-özel-lightgrey?style=flat-square)
 
 ---
 
-## What it does
+## Ne yapar
 
-A single WiseCP server module drives both panel families through one server record. The admin
-enters an IP, a reseller username and one credential; the module probes the server itself (a real
-API call, not a guess) and remembers which panel answered.
+Tek bir sunucu kaydı üzerinden iki panel ailesini de sürer. IP, bayi kullanıcı adı ve bir kimlik
+bilgisi girersiniz; modül sunucuyu gerçekten sorgular — tahmin değil, gerçek bir API çağrısı — ve
+hangi panelin yanıt verdiğini hatırlar.
 
-| Feature | cPanel/WHM | Plesk |
+| İşlem | cPanel/WHM | Plesk |
 |---|:---:|:---:|
-| Connection test with automatic panel detection | Yes | Yes |
-| Account creation | Yes | Yes |
-| Suspend / unsuspend | Yes | Yes |
-| Termination | Yes | Yes, ownership-verified |
-| Password change | Yes | Yes |
-| Package / plan change | Yes | Yes |
-| Disk & bandwidth usage (shown on the client's service page) | Yes | Yes |
-| One-click login — client area | Yes | Yes |
-| One-click login — admin area (opens the customer's panel for that service) | Yes | Yes |
+| Bağlantı testi ve otomatik panel tespiti | ✔ | ✔ |
+| Hesap oluşturma | ✔ | ✔ |
+| Askıya alma / askıdan indirme | ✔ | ✔ |
+| Sonlandırma | ✔ | ✔ (sahiplik doğrulamalı) |
+| Şifre değiştirme | ✔ | ✔ |
+| Paket / plan değiştirme | ✔ | ✔ |
+| Disk ve trafik kullanımı (müşterinin hizmet sayfasında) | ✔ | ✔ |
+| Tek tıkla panel girişi — müşteri paneli | ✔ | ✔ |
+| Tek tıkla panel girişi — yönetici paneli | ✔ | ✔ |
 
-Two safety behaviours worth knowing about up front:
+Baştan bilinmesi gereken üç koruma:
 
-- **Duplicate-domain guard.** Terminating a service is refused if the same domain is still active
-  or suspended on another service on the same server — it protects against one domain's hosting
-  being torn out from under a second, still-live order.
-- **Plesk ownership guard.** Every account the module creates on Plesk is tagged with an internal
-  identifier. Before *any* operation on a Plesk subscription — suspend, unsuspend, password change,
-  plan change, usage, termination — the module checks that tag and refuses if it doesn't match, so
-  it can never be pointed at someone else's manually-created subscription. Terminating deletes the
-  subscription first and removes the Plesk customer only once it owns nothing else; if that count
-  can't be established, the customer is left alone.
-- **Plesk domain changes are refused.** A Plesk subscription is located by its domain name, so
-  editing the domain on an existing service would leave the module unable to find it again — every
-  later operation, termination included, would fail permanently. Saving such a change is rejected
-  with a message telling you to rename the subscription in Plesk first, or to terminate and
-  re-provision. On cPanel the domain field is editable; the account keeps serving the old domain
-  until you change it in the panel.
+- **Mükerrer alan adı koruması.** Aynı alan adı aynı sunucuda başka bir aktif ya da askıdaki hizmette
+  hâlâ duruyorsa sonlandırma reddedilir. Bir alan adının hostingi, onu kullanan ikinci ve hâlâ canlı
+  bir siparişin altından çekilemez.
+- **Plesk sahiplik koruması.** Modülün Plesk'te açtığı her hesap dahilî bir kimlikle etiketlenir. Bir
+  Plesk aboneliğinde **herhangi bir** işlem yapılmadan önce — askıya alma, askıdan indirme, şifre
+  değiştirme, plan değiştirme, kullanım, sonlandırma — bu etiket kontrol edilir ve tutmuyorsa işlem
+  reddedilir; modül panelde elle oluşturulmuş bir aboneliğe asla yönlendirilemez. Sonlandırmada önce
+  abonelik silinir, müşteri ise ancak başka hiçbir aboneliği kalmadıysa kaldırılır. Bu sayı
+  belirlenemezse müşteriye dokunulmaz.
+- **Plesk'te alan adı değişikliği reddedilir.** Bir Plesk aboneliği alan adıyla bulunduğundan, mevcut
+  bir hizmetin alan adını düzenlemek modülü o aboneliği bir daha bulamaz hâle getirir — sonlandırma
+  dahil sonraki her işlem kalıcı olarak başarısız olur. Böyle bir kayıt, "önce Plesk'te aboneliği
+  yeniden adlandırın ya da sonlandırıp yeniden oluşturun" diyen bir mesajla reddedilir. cPanel'de alan
+  adı düzenlenebilir; hesap, siz panelde değiştirene kadar eski alan adına hizmet vermeye devam eder.
 
-**Not included:** email account / forwarder management, selling reseller accounts, importing
-existing accounts into WiseCP, and an admin "log in to the root panel" button. The module only ever
-holds a reseller credential — never root — so there is no root panel for it to open.
-
----
-
-## Requirements
-
-- A self-hosted **WiseCP** installation with admin access
-- PHP with the **cURL** and **SimpleXML** extensions enabled (present on essentially every default
-  PHP build)
-- Either a **cPanel/WHM reseller account** (with a WHM API token — see below) or a **Plesk reseller
-  account** (with an API key or just its panel password)
-- Outbound network access from the WiseCP server to the panel server, on the panel's API port
-
-No database table is created, nothing is installed via Composer, and there is no build step.
+**Kapsam dışı:** e-posta hesabı ve yönlendirme yönetimi, bayi hesabı satışı, mevcut hesapların
+WiseCP'ye içe aktarılması ve yöneticide "root paneline giriş" butonu. Modül yalnızca bir **bayi**
+kimlik bilgisi tutar — root değil — dolayısıyla açabileceği bir root paneli yoktur.
 
 ---
 
-## Installation
+## Gereksinimler
 
-Copy the module folder into your WiseCP installation:
+- Yönetici erişiminiz olan, kendi sunucunuzda kurulu bir **WiseCP**
+- **cURL** ve **SimpleXML** eklentileri açık bir PHP (neredeyse her varsayılan kurulumda vardır)
+- Ya bir **cPanel/WHM bayi hesabı** (WHM API token'ı ile) ya da bir **Plesk bayi hesabı** (API anahtarı
+  ya da doğrudan panel şifresiyle)
+- WiseCP sunucusundan panel sunucusuna, panelin API portunda dışa açık ağ erişimi
+
+Veritabanı tablosu oluşturulmaz, Composer ile bir şey kurulmaz, derleme adımı yoktur.
+
+---
+
+## Kurulum
+
+Modül klasörünü WiseCP kurulumunuza kopyalayın:
 
 ```
 coremio/
 └── modules/
     └── Servers/
-        └── DNAHosting/     ← copy the whole folder here
+        └── DNAHosting/     ← klasörün tamamı buraya
 ```
 
-That's the entire installation. There is nothing to run afterwards — no migration, no cache
-warm-up, no separate activation step. The module appears the next time you open the "Add Server"
-screen.
+Kurulum bundan ibarettir. Sonrasında çalıştırılacak bir şey yok — migration yok, önbellek ısıtma yok,
+ayrı bir etkinleştirme adımı yok. Modül, sunucu ekleme ekranını bir sonraki açışınızda listede
+görünür.
 
 ---
 
-## Adding the server
+## Sunucu ekleme
 
-**Services → Hosting Management → Server Settings → Add New Server**
+**Ürünler / Hizmetler → Hosting/Sunucu → Paylaşımlı Sunucu Ayarları → `Yeni Paylaşımlı Sunucu Ekle`**
 
-| Field | What to enter |
+Formun **Sunucu Otomasyon Bilgileri** bölümünü doldurun:
+
+| Alan | Ne girilir |
 |---|---|
-| **Server Automation Type** | `DNAHosting` — this is the folder name, shown as-is in the dropdown |
-| **Hostname** | A label for your own reference (e.g. `panel1.example.com`); it is not used to connect |
-| **IP Address** | The panel server's actual address — this is what the module connects to |
-| **Username** | Your reseller username on that panel |
-| **Password** | **cPanel:** a WHM API token. **Plesk:** either an API secret key or the reseller's panel password |
-| **Access Hash** | Not shown — this field stays hidden for DNAHosting servers |
-| **Port** | `2087` for cPanel, `8443` for Plesk (the form defaults to the cPanel port; change it for a Plesk server) |
-| **SSL** | Checked |
+| **Sunucu Otomasyon Türü** | `DNAHosting` — klasör adıdır, listede olduğu gibi görünür |
+| **IP Adresi** | Panel sunucusunun gerçek adresi; modül buraya bağlanır |
+| **Kullanıcı Adı** | O paneldeki bayi kullanıcı adınız |
+| **Şifre** | **cPanel:** WHM API token'ı. **Plesk:** API anahtarı ya da bayinin panel şifresi |
+| **SSL ile Bağlan** | İşaretleyin |
+| **Port** | cPanel için `2087`, Plesk için `8443` |
 
-Two details that are easy to miss:
+Formun üst kısmındaki **Hostname** alanı yalnızca sizin için bir etikettir — modül bağlanmak için onu
+değil **IP Adresi** alanını kullanır. Sunucularınız liste ekranında bu etiketle görünür.
 
-- **The credential always goes in the Password field, on both panels.** WiseCP stores that field
-  encrypted. This module doesn't use the "Access Hash" field at all — it stays hidden on the form
-  and never appears for a DNAHosting server.
-- **The port only decides which panel is probed first.** `8443`/`8880` makes the module try Plesk
-  first, anything else tries cPanel first — but it always confirms with a real API call and falls
-  back to the other panel if the first guess doesn't answer. A wrong port slows detection down; it
-  does not break it.
+Kolayca gözden kaçan dört ayrıntı:
 
-Saving the server automatically runs a connection test (WiseCP does this for every server-type
-module). A green result confirms both the credential and the detected panel; a failure shows the
-concrete HTTP status or panel error — see [Troubleshooting](#troubleshooting).
+- **Port alanı kilitlidir.** Yanındaki **Standart Portu Değiştir** kutusunu işaretlemeden port
+  yazamazsınız. Kutu işaretsizken alan modülün varsayılanını gösterir: SSL kapalıyken `2086`, **SSL ile
+  Bağlan**'ı işaretlediğinizde `2087`. cPanel için bu kadarı yeter — SSL'i işaretleyin, port kendiliğinden
+  2087 olur. **Plesk için `8443` girmeniz gerekir**, yani o kutuyu işaretlemek zorundasınız.
+- **Kimlik bilgisi her iki panelde de Şifre alanına yazılır.** WiseCP bu alanı şifreli saklar. Bu modül
+  **Erişim Anahtarı (Access Hash)** alanını hiç kullanmaz; alan DNAHosting sunucularında formda zaten
+  görünmez.
+- **Port yalnızca hangi panelin önce denendiğini belirler.** `8443`/`8880` girildiğinde önce Plesk,
+  diğer her değerde önce cPanel denenir — ama karar her zaman gerçek bir API çağrısıyla verilir ve ilk
+  tahmin yanıt vermezse diğerine geçilir. Yanlış port tespiti yavaşlatır, bozmaz.
+- **`Bağlantıyı Sına`** butonu formu kaydetmeden denemenizi sağlar. Kaydettiğinizde WiseCP zaten
+  otomatik bir bağlantı testi çalıştırır. Yeşil sonuç hem kimlik bilgisini hem tespit edilen paneli
+  doğrular; hata durumunda somut HTTP kodu ya da panel hatası gösterilir — bkz.
+  [Sorun giderme](#sorun-giderme).
 
 ---
 
-## cPanel WHM API token — required ACLs
+## cPanel WHM API token'ı — gereken ACL'ler
 
-The WHM API token you put in the Password field can never exceed the ACLs already granted to the
-reseller account that generated it. Before creating the token, make sure that reseller's ACL list
-grants:
+Şifre alanına koyduğunuz token, onu üreten bayi hesabına verilmiş ACL'lerin ötesine asla geçemez.
+Token'ı üretmeden önce o bayinin ACL listesinde şunların açık olduğundan emin olun:
 
 ```
 list-accts
@@ -135,80 +138,96 @@ show-bandwidth
 create-user-session
 ```
 
-Generate the token itself from **WHM → Development → Manage API Tokens** while logged in as that
-reseller — a token created inside cPanel's own interface (rather than WHM) never carries WHM access,
-no matter what ACLs the account has.
+Token'ın kendisini, **o bayi olarak giriş yapmışken** **WHM → Development → Manage API Tokens**
+üzerinden üretin. cPanel'in kendi arayüzünden (WHM'den değil) üretilen bir token, hesabın ACL'leri ne
+olursa olsun WHM erişimi taşımaz.
 
 ---
 
-## Plesk API key — the one thing that trips people up
+## Plesk API anahtarı — herkesin takıldığı yer
 
-A Plesk API key is bound to the IP address it was generated for. If you generate a key on your
-workstation, or copy one from a different server, authentication fails as soon as your WiseCP
-server tries to use it — that failure is reported as **`Plesk (11003)`**.
+Bir Plesk API anahtarı **üretildiği IP adresine bağlıdır.** Anahtarı kendi bilgisayarınızda üretir ya
+da başka bir sunucudan kopyalarsanız, WiseCP sunucunuz onu kullanmaya kalktığı anda kimlik doğrulama
+başarısız olur. Bu hata **`Plesk (11003)`** olarak raporlanır.
 
-Generate the key **on the Plesk server itself**, for the address WiseCP will actually connect from
-(its outbound/public IP — not the panel's own IP), via **Tools & Settings → API keys**.
+Anahtarı **Plesk sunucusunun kendisinde**, WiseCP'nin bağlanacağı adres için (WiseCP sunucusunun dışa
+çıkan IP'si — panelin kendi IP'si değil) **Tools & Settings → API keys** üzerinden üretin.
 
-If that's inconvenient, skip the key entirely and put your reseller account's **panel password** in
-the server's Password field instead. The module always tries the credential as an API key first; if
-that fails, it automatically falls back to HTTP basic auth — you don't need to tell it which one
-you're using.
-
----
-
-## Defining the product
-
-**Services → Hosting Management → Hosting Packages → Create New Package**
-
-Under **Server Selection**, choose **Single Server** and pick the DNAHosting server you added (if
-you use a server group instead, the module still renders its form against one concrete server in
-that group — keep panel-compatible servers grouped together).
-
-Once a server is selected, the module renders its own **Package / Plan** field, populated live from
-that exact server:
-
-- **cPanel:** every package returned by the server's `listpkgs`. If your packages carry the usual
-  reseller prefix (e.g. `bakcay_starter`), you can enter either the full name or just `starter` —
-  the module resolves the prefix itself.
-- **Plesk:** every service plan defined on the server.
-
-Pick the package/plan, fill in the rest of the product form as usual, and save. The product is now
-sellable — ordering it runs the full create-account flow against the server you configured.
+Bu zahmetliyse anahtarı tümüyle atlayın ve bayi hesabınızın **panel şifresini** Şifre alanına yazın.
+Modül kimlik bilgisini önce API anahtarı olarak dener; tutmazsa kendiliğinden HTTP basic auth'a düşer.
+Hangisini kullandığınızı ona söylemeniz gerekmez.
 
 ---
 
-## Troubleshooting
+## Sunucu grupları (isteğe bağlı)
 
-| Symptom | Cause | Fix |
+Birden fazla sunucunuz varsa **Paylaşımlı Sunucu Ayarları → `Sunucu Grupları`** altında grup
+oluşturup ürünü tek bir sunucu yerine gruba bağlayabilirsiniz. Grup düzenleme ekranında iki dağıtım
+türü var:
+
+- **Her zaman en düşük doluluktaki sunucuya ekle.**
+- **Bir sunucu tamamen dolana kadar ekle. Ardından en düşük doluluktaki sunucuya geç.**
+
+Sunucular **Atanmamış → Atanmış** listeleri arasında `Ekle` / `Kaldır` ile taşınır.
+
+> **Grubu panel bazında homojen tutun.** Ürün formundaki paket listesi o an seçili olan **tek bir**
+> sunucudan çekilir. Bir grupta hem cPanel hem Plesk sunucusu varsa seçtiğiniz paket adı diğer panelde
+> karşılık bulmayabilir ve o sunucuya düşen sipariş "paket bulunamadı" ile başarısız olur.
+
+---
+
+## Ürünü tanımlama
+
+**Ürünler / Hizmetler → Hosting/Sunucu → Web Hosting Paketleri** → paketi açın → **Modül Ayarları**
+sekmesi.
+
+**Sunucu Seçimi** altında **Tekil Sunucu** ya da **Sunucu Grubu** seçip DNAHosting sunucunuzu (veya
+grubunuzu) işaretleyin. Seçim yapıldığı anda modül kendi alanlarını çizer:
+
+| Alan | Anlamı |
+|---|---|
+| **Tespit edilen panel** | Modülün o sunucuda gerçekten bulduğu panel — örneğin `cPanel / WHM`. Tespitin çalıştığını burada görürsünüz; bir sorun varsa bu satırda hata metni belirir. |
+| **Paket / Plan** | O sunucudan canlı çekilen paket listesi |
+| **Otomatik Kurulum** | Açıkken sipariş otomatik kurulur; kapalıyken yönetici onayı gerekir |
+
+Paket listesi panele göre gelir:
+
+- **cPanel:** sunucunun `listpkgs` çıktısındaki her paket. Paketleriniz alışıldık bayi ön ekini
+  taşıyorsa (örneğin `bakcay328_paket1`) modül ön eki kendisi çözer.
+- **Plesk:** sunucuda tanımlı her servis planı.
+
+Paketi seçin, formun geri kalanını her zamanki gibi doldurup kaydedin. Ürün artık satılabilir —
+sipariş verildiğinde tam hesap açma akışı yapılandırdığınız sunucuya karşı çalışır.
+
+---
+
+## Sorun giderme
+
+| Belirti | Sebep | Çözüm |
 |---|---|---|
-| A call (often the connection test) fails with `HTTP 403`, or succeeds but the error text mentions a `cpanelresult` envelope | The reseller account behind the token doesn't have WHM-level access for that function, so WHM answered with the cPanel *user* API instead of WHM API 1 | In WHM, open **Resellers → Edit Reseller's ACL List** for this reseller and grant the ACLs listed in the *cPanel WHM API token* section above; regenerate the token from **WHM → Development → Manage API Tokens** while logged in as that reseller |
-| `Plesk (11003)` | The API key was generated for a different IP address than the one WiseCP connects from | Generate a new key on the Plesk server for the correct IP (see the *Plesk API key* section above), or switch the Password field to the panel password instead |
-| `Plesk (1014)` | Plesk rejected the request body — an element was missing or in the wrong place for the XML-API version this server speaks | Confirm you're running the current release of this module (older, hand-rolled Plesk requests using the deprecated `<domain>` operator are rejected by current Plesk with this same code); the module log shows exactly which element Plesk objected to |
+| Bir çağrı (çoğunlukla bağlantı testi) `HTTP 403` ile düşüyor ya da hata metninde `cpanelresult` zarfı geçiyor | Token'ın arkasındaki bayi hesabının o fonksiyon için WHM düzeyinde yetkisi yok; WHM, WHM API 1 yerine cPanel **kullanıcı** API'siyle yanıt verdi | WHM'de **Resellers → Edit Reseller's ACL List**'i açıp yukarıdaki ACL'leri verin, ardından token'ı **WHM → Development → Manage API Tokens**'tan o bayi olarak yeniden üretin |
+| `Plesk (11003)` | API anahtarı, WiseCP'nin bağlandığı IP'den başka bir adres için üretilmiş | Doğru IP için Plesk sunucusunda yeni anahtar üretin ya da Şifre alanına panel şifresini yazın |
+| `Plesk (1014)` | Plesk istek gövdesini reddetti — bir eleman eksik ya da bu sunucunun konuştuğu XML-API sürümü için yanlış yerde | Modülün güncel sürümünü kullandığınızı doğrulayın; modül logu Plesk'in tam olarak hangi elemana itiraz ettiğini gösterir |
+| Ürün formunda paket listesi yerine hata metni | Tespit ya da paket çağrısı başarısız oldu; sebep aynı satırda yazılıdır | Metindeki somut hataya göre yukarıdaki satırlardan birini uygulayın |
 
-> The diagnostic detail appended after a Plesk error code (e.g. the sentence after `Plesk (11003):`)
-> is written in Turkish in this release, regardless of which admin language you're using — the table
-> above is the English translation of what you'll actually see.
-
-Any other HTTP error always comes with a plain-text summary of the panel's response body attached,
-so a bare status code is never the whole story — check the module log for the full request and
-response.
+Diğer her HTTP hatası, panelin yanıt gövdesinden çıkarılmış düz metin bir özetle gelir; çıplak bir durum
+kodu hiçbir zaman hikâyenin tamamı değildir. Tam istek ve yanıt için modül loguna bakın.
 
 ---
 
-## Logs
+## Loglar
 
-**Tools → Process Logs → Module Activity Log**
+**Araçlar → İşlem Kayıtları (Logs) → Modül İşlem Kayıtları**
 
-Every request the module sends and every response it receives is recorded here, tagged with the
-action (e.g. `createacct`, `webspace.add`). Logging only happens while the **Module Activity Log**
-feature is switched on — that toggle lives at the top of the same page.
+Modülün gönderdiği her istek ve aldığı her yanıt, işlem adıyla (örneğin `createacct`, `webspace.add`)
+etiketlenerek buraya yazılır. Kayıt yalnızca **Modül İşlem Kayıtları** özelliği açıkken tutulur; o
+anahtar aynı sayfanın üst kısmındadır.
 
-The server's API token/password and any account password the module generates or changes are masked
-to `***` before anything is written, in both the request and the response.
+Sunucunun API token'ı/şifresi, modülün ürettiği ya da değiştirdiği hesap şifreleri ve SSO oturum
+jetonları — hem istekte hem yanıtta — yazılmadan önce `***` ile maskelenir.
 
 ---
 
-## License
+## Lisans
 
-Proprietary. All rights reserved.
+Özel. Tüm hakları saklıdır.
