@@ -404,7 +404,12 @@ Bu yüzden `DNAHosting_Support::domainKey()` yalnızca kırpma ve küçük harfe
 
 **Loglama:** her API çağrısı `Modules::save_log("Servers", "DNAHosting", $action, $request, $response, $processed)` ile kayda geçer. Çekirdek dizileri `Utility::jencode()` ile serileştirir (`Modules.php:229-231`), yani diziyi olduğu gibi vermek doğrudur.
 
-**Maskeleme:** token, şifre ve session URL'leri loga yazılmadan önce maskelenir.
+**Maskeleme:** token, şifre ve session URL'leri loga yazılmadan önce maskelenir. Bunun **iki** mekanizması var ve ikisi de gerekli:
+
+- `DNAHosting_Http::addSecret()` — değeri **önceden bilinen** sırlar için (sunucu token'ı/şifresi, üretilen hesap şifresi). Kayıttan sonraki her satırda maskelenir.
+- `DNAHosting_Http::addResponseRedaction($action, $patterns)` — değeri **yanıtın kendisinde** gelen sırlar için. SSO oturum açma çağrıları (`create_user_session`, `server.create_session`) böyledir: çağıran değeri ancak o satır **loglandıktan sonra** öğrenir, yani `addSecret()` tek başına jetonu taşıyan satırı kurtaramaz. Desen, değer bilinmeden önce eylem adına kaydedilir.
+
+Redaksiyonun kapsamı bilerek **eylem adıdır**, tek atımlık bir bayrak değil: Plesk `request()` kimlik hatasında ikinci bir istek atar ve tek atımlık bir bayrak orada tükenip asıl yanıtı maskesiz bırakırdı. Redaksiyon yalnızca **log ve hata kopyasına** uygulanır — çağırana ham gövde döner — ve gövdenin tamamını değil yalnızca kimlik alanlarını gizler, böylece aşağıdaki teşhis kalitesi şartı korunur.
 
 **Hata mesajı kalitesi** — WHMCS portunda öğrenilen dersler doğrudan taşınır:
 
