@@ -180,10 +180,33 @@ test('cPanel createSession tam URL dondurur', function () {
     $url = $c->createSession('ornek1', 'cpaneld', '9.9.9.9');
     assertSame('https://1.2.3.4:2083/cpsess123/', $url);
     assertContains('create_user_session', $t->lastCall()['url']);
+    assertContains('client_ip=9.9.9.9', $t->lastCall()['body']);
 });
 
 test('cPanel createSession goreli URLyi mutlaklastirir', function () {
     list($c, $t) = dna_cpanel();
     $t->push(200, '{"metadata":{"result":1},"data":{"url":"/cpsess123/"}}');
     assertSame('https://1.2.3.4:2083/cpsess123/', $c->createSession('ornek1'));
+});
+
+test('cPanel changePassword dogru fonksiyonu cagirir', function () {
+    list($c, $t) = dna_cpanel();
+    $ok = '{"metadata":{"result":1},"data":{}}';
+    $t->push(200, $ok);
+    assertTrue($c->changePassword('ornek1', 'YeniSifre.123!'));
+    assertContains('passwd', $t->lastCall()['url']);
+    assertContains('password=YeniSifre', $t->lastCall()['body']);
+});
+
+test('cPanel accountSummary taşıma hatasında null yerine hata firlatir, usage bunu gercek sebebe donerek "not found" demez', function () {
+    list($c, $t) = dna_cpanel();
+    $t->push(200, '{"metadata":{"result":0,"reason":"API sikintili"}}');
+    assertThrows(function () use ($c) {
+        $c->accountSummary('ornek1');
+    }, 'API sikintili');
+    $t->push(200, '{"metadata":{"result":0,"reason":"API sikintili"}}');
+    $e = assertThrows(function () use ($c) {
+        $c->usage('ornek1');
+    }, 'API sikintili');
+    assertContains('API sikintili', $e->getMessage());
 });

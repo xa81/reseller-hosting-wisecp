@@ -130,6 +130,7 @@ class DNAHosting_Cpanel
 
     public function createAccount(array $a)
     {
+        $this->http->addSecret($a['password']);
         $plan = $this->resolvePackage($a['plan']);
 
         $args = array(
@@ -143,11 +144,15 @@ class DNAHosting_Cpanel
         try {
             $this->call('createacct', $args);
         } catch (DNAHosting_Exception $e) {
-            $summary = $this->accountSummary($a['username']);
-            if ($summary && isset($summary['domain'])
-                && strcasecmp($summary['domain'], $a['domain']) === 0) {
-                // Hesap aslinda acilmis, yalnizca yanit gecikmis.
-                return array('username' => $a['username'], 'password' => $a['password']);
+            try {
+                $summary = $this->accountSummary($a['username']);
+                if ($summary && isset($summary['domain'])
+                    && strcasecmp($summary['domain'], $a['domain']) === 0) {
+                    // Hesap aslinda acilmis, yalnizca yanit gecikmis.
+                    return array('username' => $a['username'], 'password' => $a['password']);
+                }
+            } catch (DNAHosting_Exception $summaryError) {
+                // accountsummary icin bir hata oldu, ilk hatayi tekrar firlat
             }
             throw $e;
         }
@@ -160,7 +165,11 @@ class DNAHosting_Cpanel
         try {
             $data = $this->call('accountsummary', array('user' => $username));
         } catch (DNAHosting_Exception $e) {
-            return null;
+            $message = $e->getMessage();
+            if (stripos($message, 'does not exist') !== false || stripos($message, 'not exist') !== false) {
+                return null;
+            }
+            throw $e;
         }
         if (isset($data['acct'][0])) {
             return $data['acct'][0];
@@ -188,6 +197,7 @@ class DNAHosting_Cpanel
 
     public function changePassword($username, $password)
     {
+        $this->http->addSecret($password);
         $this->call('passwd', array('user' => $username, 'password' => $password));
         return true;
     }
