@@ -446,6 +446,7 @@ Bu maddeler tasarımla kapatılamaz; canlı sunucuda doğrulanmaları gerekir.
 | 3 | ~~İstemci IP'sini almanın WiseCP'deki doğru yolu~~ **Kapandı.** `UserManager::GetIP()` (`coremio/classes/UserManager.php:388`) doğru yöntem; `DNAHosting.php::clientIp()` bunu kullanıyor ve `IP` doğrulamasından geçmeyen sonuçları eler. | ~~SSO uygulanırken doğrulanır~~ Doğrulandı |
 | 4 | `getPlans()` dönüş şeklinin ürün formunda beklenen anahtarlarla uyumu | Form render edilerek görülür |
 | 5 | Terminate, SSO ve kullanım yolları **WHMCS tarafında da hiç canlı çalıştırılmadı** | İki modül için de aynı canlı test turu gerekir |
+| 6 | **Ayrıştırma hatası yolunda redaksiyon atlanıyor.** `Plesk::attempt()` ve `Cpanel::unwrap()`, gövde ayrıştırılamadığında hata mesajlarını **ham** gövdeden kuruyor (`summarise($response['body'])`) — yani `Http`'nin yanıt redaksiyonunu baypas ediyorlar. `openPanel()` de `$this->error`'u müşterinin tarayıcısına basıyor. Dar bir yol: ayrıştırıcının reddettiği **ve** ilk 300 karakterinde jetonu taşıyan bir SSO yanıtı gerekiyor. Final incelemede kapsam dışı olarak işaretlendi, merge'i engellemedi. | Temiz çözüm: `Http::send()` redakte edilmiş kopyayı da döndürsün, iki sürücü de özeti **ondan** çıkarsın |
 
 ---
 
