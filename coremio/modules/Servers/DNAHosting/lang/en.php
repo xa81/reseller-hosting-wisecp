@@ -16,5 +16,7 @@
         'disk-usage'       => "Disk Usage",
         'bandwidth-usage'  => "Bandwidth Usage",
         'error-no-order'   => "This service has no panel account yet.",
+        'error-no-plan'    => "No package/plan is selected on the product being upgraded to. Edit the product and pick a package in the module section; otherwise the package change cannot be applied.",
+        'error-domain-change-plesk' => "The domain cannot be changed here on Plesk: this service is bound to the \"{old}\" subscription on the panel, not \"{new}\". Saving the change would make every later operation - suspend, password change and termination included - fail permanently. Rename the subscription in Plesk first and then update this field, or terminate the service and re-provision it.",
         'error-shared-domain' => "This domain is still in use by another active service on the same server, so it was not terminated.",
     ];

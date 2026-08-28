@@ -205,6 +205,83 @@ test('Modul change_plan bos plani sessizce gecer', function () {
     assertSame(0, count($t->calls));
 });
 
+test('Modul apply_updowngrade eski creation_info yerine yeni urunun planini uygular', function () {
+    // Cekirdek bu cagriyi ESKI siparis secenekleriyle yapar (orders.php:3070-3076) ve
+    // creation_info'yu ancak modul donduktun SONRA tazeler (orders.php:254-255).
+    // creation_info'ya once bakilirsa her yukseltme eski paketi yeniden uygular.
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{"pkg":['
+            . '{"name":"eski","QUOTA":"1","BWLIMIT":"1"},'
+            . '{"name":"yeni","QUOTA":"2","BWLIMIT":"2"}]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    });
+    $m->config['user'] = 'ornek1';
+    $ok = $m->apply_updowngrade(
+        array('creation_info' => array('plan' => 'eski')),
+        array('module_data' => array('create_account' => array('plan' => 'yeni')))
+    );
+    assertTrue($ok, 'yukseltme basarili olmali, error: ' . $m->error);
+    assertContains('pkg=yeni', $t->lastCall()['body']);
+    assertSame(false, strpos($t->lastCall()['body'], 'pkg=eski'), 'eski paket tele cikmamali');
+});
+
+test('Modul apply_updowngrade duz module_data.plan dalini da okur', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{"pkg":['
+            . '{"name":"bayi_kurumsal","QUOTA":"1","BWLIMIT":"1"}]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    });
+    $m->config['user'] = 'ornek1';
+    $ok = $m->apply_updowngrade(
+        array('creation_info' => array('plan' => 'eski')),
+        array('module_data' => array('plan' => 'kurumsal'))
+    );
+    assertTrue($ok, 'error: ' . $m->error);
+    assertContains('pkg=bayi_kurumsal', $t->lastCall()['body']);
+});
+
+test('Modul apply_updowngrade module_data JSON dizesi olarak gelse de cozer', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{"pkg":[{"name":"yeni","QUOTA":"1","BWLIMIT":"1"}]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    });
+    $m->config['user'] = 'ornek1';
+    $ok = $m->apply_updowngrade(
+        array('creation_info' => array('plan' => 'eski')),
+        array('module_data' => '{"create_account":{"plan":"yeni"}}')
+    );
+    assertTrue($ok, 'error: ' . $m->error);
+    assertContains('pkg=yeni', $t->lastCall()['body']);
+});
+
+test('Modul apply_updowngrade hicbir yerde plan yoksa hata verir, sessizce basarili donmez', function () {
+    // change_plan('') tek basina true doner; Critical 1 duzeltmesinden sonra bu,
+    // "hicbir sey degistirmeden basarili" raporlayan bir yukseltme demek olurdu.
+    list($m, $t) = dna_module_n(2087, function ($t) { });
+    $m->config['user'] = 'ornek1';
+    assertSame(false, $m->apply_updowngrade(
+        array('creation_info' => array()),
+        array('module_data' => array())
+    ));
+    assertContains('plan', strtolower($m->error));
+    assertSame(0, count($t->calls), 'plan cozulemediyse panele hic gidilmemeli');
+});
+
+test('Modul apply_updowngrade urun yoksa creation_info planina duser', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{"pkg":[{"name":"eski","QUOTA":"1","BWLIMIT":"1"}]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    });
+    $m->config['user'] = 'ornek1';
+    $ok = $m->apply_updowngrade(array('creation_info' => array('plan' => 'eski')), array());
+    assertTrue($ok, 'error: ' . $m->error);
+    assertContains('pkg=eski', $t->lastCall()['body']);
+});
+
 test('Modul externalId siparis kimliginden turer', function () {
     list($m, $t) = dna_module_n(2087, function ($t) { });
     assertSame('wisecp-501', $m->externalId());

@@ -195,24 +195,53 @@ class DNAHosting_Module extends ServerModule
         return DNAHosting_Support::usernameFor($domain, $panel);
     }
 
-    private function planOf(array $options)
+    /** Urunun kendi module_data'sindaki paket adi (urun formunun yazdigi yer). */
+    private function productPlan()
     {
-        $creation = isset($options['creation_info']) ? $options['creation_info'] : array();
-        if (isset($creation['plan']) && trim($creation['plan']) !== '') {
-            return $creation['plan'];
-        }
-
         $moduleData = isset($this->product['module_data']) ? $this->product['module_data'] : array();
         if (is_string($moduleData)) {
             $moduleData = json_decode($moduleData, true);
         }
-        if (isset($moduleData['create_account']['plan'])) {
-            return $moduleData['create_account']['plan'];
+        if (!is_array($moduleData)) {
+            return '';
         }
-        if (isset($moduleData['plan'])) {
-            return $moduleData['plan'];
+        if (isset($moduleData['create_account']['plan'])
+            && trim((string) $moduleData['create_account']['plan']) !== '') {
+            return (string) $moduleData['create_account']['plan'];
+        }
+        if (isset($moduleData['plan']) && trim((string) $moduleData['plan']) !== '') {
+            return (string) $moduleData['plan'];
         }
         return '';
+    }
+
+    /** Siparise olusturma aninda kopyalanmis paket adi. */
+    private function creationPlan(array $options)
+    {
+        $creation = isset($options['creation_info']) ? $options['creation_info'] : array();
+        if (isset($creation['plan']) && trim((string) $creation['plan']) !== '') {
+            return (string) $creation['plan'];
+        }
+        return '';
+    }
+
+    /**
+     * Paket adini cozer.
+     *
+     * $preferProduct = false (hesap acma): siparisin creation_info'su onceliklidir; orada
+     * o siparis icin secilmis paket durur.
+     * $preferProduct = true (yukseltme/dusurme): urunun module_data'si onceliklidir — bkz.
+     * apply_updowngrade().
+     */
+    private function planOf(array $options, $preferProduct = false)
+    {
+        $fromProduct  = $this->productPlan();
+        $fromCreation = $this->creationPlan($options);
+
+        if ($preferProduct) {
+            return $fromProduct !== '' ? $fromProduct : $fromCreation;
+        }
+        return $fromCreation !== '' ? $fromCreation : $fromProduct;
     }
 
     public function createAccount($domain, $options = array())
@@ -428,14 +457,39 @@ class DNAHosting_Module extends ServerModule
         }
     }
 
+    /**
+     * Yeni paketi UYGULAR — ve yeni paket yalnizca urunun module_data'sinda vardir.
+     *
+     * Cekirdek bu cagriyi ESKI siparis secenekleriyle yapar: hosting_module_operation()
+     * once $orderopt = $order["options"] der, sonra apply_updowngrade($orderopt, $product)
+     * cagirir (coremio/helpers/orders.php:3061-3076). $order["options"]["creation_info"]
+     * siparis olusturulurken ESKI urunden yazilmistir (orders.php:1147-1152) ve cekirdek
+     * onu yeni urune gore ancak bu cagri DONDUKTEN sonra tazeler (orders.php:254-255).
+     *
+     * Bu yuzden creation_info'ya once bakmak her yukseltmede eski paketi yeniden uygular,
+     * panel "tamam" der, cekirdek yukseltmeyi basarili sayar ve yeni fiyati faturalar —
+     * musteri almadigi bir yukseltmenin parasini oder. Tasarim §5.5 zaten "urunun
+     * module_data'sindan yeni paketi okur" diyor; dogru kaynak odur.
+     */
     public function apply_updowngrade($orderopt = array(), $product = array())
     {
         if ($product) {
             $this->product = $product;
         }
-        return $this->change_plan($this->planOf(is_array($orderopt) ? $orderopt : array()));
+
+        $plan = $this->planOf(is_array($orderopt) ? $orderopt : array(), true);
+
+        // change_plan('') tek basina true doner — bu izole halde dogrudur, ama burada
+        // "hicbir sey degistirmeden basarili" raporlanan bir yukseltme demek olur.
+        if (trim((string) $plan) === '') {
+            $this->error = $this->lang['error-no-plan'];
+            return false;
+        }
+
+        return $this->change_plan($plan);
     }
 
+    /** Cekirdekte cagri yeri yok; WiseCP hosting modullerinden bu metodu hic istemiyor. */
     public function modifyAccount($params = array())
     {
         return false;
