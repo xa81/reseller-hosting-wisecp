@@ -319,6 +319,67 @@ test('Modul apply_options kodlanmis sifreyi hem config hem ftp_info alaninda don
     assertSame('ENC:yenisifre123', $r['ftp_info']['password']);
 });
 
+test('Modul apply_options sifre gercekten degistiyse panele gider', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+        $t->push(200, '{"metadata":{"result":1},"data":{}}');
+    });
+    $old = array('domain' => 'ornek.com', 'config' => array('user' => 'ornek1', 'password' => 'ENC:eskisifre'));
+    $new = array('domain' => 'ornek.com', 'config' => array('user' => 'ornek1', 'password' => 'yenisifre123'));
+    $r = $m->apply_options($old, $new);
+    assertTrue(is_array($r), 'dizi bekleniyordu, error: ' . $m->error);
+    assertSame(2, count($t->calls), 'tespit + passwd cagrisi bekleniyor');
+    assertContains('passwd', $t->lastCall()['url']);
+    assertSame('ENC:yenisifre123', $r['config']['password']);
+});
+
+test('Modul apply_options sifre degismediyse panele hic gitmez', function () {
+    // Kayitli deger KODLANMIS, formdan gelen deger DUZ METIN. Duz metni dogrudan
+    // karsilastirmak her "Kaydet"te canli panel sifresini sifirlar; karsilastirma
+    // kodlanmis taraflar uzerinden yapilmalidir.
+    list($m, $t) = dna_module_n(2087, function ($t) { });
+    $old = array('domain' => 'ornek.com', 'config' => array('user' => 'ornek1', 'password' => 'ENC:ayni.sifre'));
+    $new = array('domain' => 'ornek.com', 'config' => array('user' => 'ornek1', 'password' => 'ayni.sifre'));
+    $r = $m->apply_options($old, $new);
+    assertTrue(is_array($r), 'dizi bekleniyordu, error: ' . $m->error);
+    assertSame(0, count($t->calls), 'sifre degismediginde hicbir istek cikmamali');
+    assertSame('ENC:ayni.sifre', $r['config']['password'], 'kalicilastirilan deger kodlanmis olmali');
+    assertSame('ENC:ayni.sifre', $r['ftp_info']['password']);
+});
+
+test('Modul apply_options bos sifre alani kayitli sifreyi silmez', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) { });
+    $old = array('domain' => 'ornek.com', 'config' => array('user' => 'ornek1', 'password' => 'ENC:kayitli'));
+    $new = array('domain' => 'ornek.com', 'config' => array('user' => 'ornek1', 'password' => ''));
+    $r = $m->apply_options($old, $new);
+    assertSame('ENC:kayitli', $r['config']['password']);
+    assertSame(0, count($t->calls));
+});
+
+test('Modul apply_options Plesk tarafinda alan adi degisikligini reddeder', function () {
+    list($m, $t) = dna_module_n(8443, function ($t) {
+        $t->push(200, '<?xml version="1.0"?><packet><server><get><result>'
+            . '<status>ok</status></result></get></server></packet>');
+    });
+    $old = array('domain' => 'eski.com', 'config' => array('user' => 'ornek1', 'password' => 'ENC:s'));
+    $new = array('domain' => 'yeni.com', 'config' => array('user' => 'ornek1', 'password' => 's'));
+    assertSame(false, $m->apply_options($old, $new));
+    assertContains('eski.com', $m->error, 'mesaj eski alan adini anmali');
+    assertContains('yeni.com', $m->error, 'mesaj yeni alan adini anmali');
+    assertSame(1, count($t->calls), 'yalnizca panel tespiti; hicbir degisiklik gonderilmemeli');
+});
+
+test('Modul apply_options cPanel tarafinda alan adi degisikligini engellemez', function () {
+    list($m, $t) = dna_module_n(2087, function ($t) {
+        $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');
+    });
+    $old = array('domain' => 'eski.com', 'config' => array('user' => 'ornek1', 'password' => 'ENC:s'));
+    $new = array('domain' => 'yeni.com', 'config' => array('user' => 'ornek1', 'password' => 's'));
+    $r = $m->apply_options($old, $new);
+    assertTrue(is_array($r), 'dizi bekleniyordu, error: ' . $m->error);
+    assertSame('ftp.yeni.com', $r['ftp_info']['host']);
+});
+
 test('Modul getDisk WiseCP sozlesmesine uyar', function () {
     list($m, $t) = dna_module_n(2087, function ($t) {
         $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');

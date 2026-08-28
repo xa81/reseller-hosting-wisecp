@@ -495,23 +495,81 @@ class DNAHosting_Module extends ServerModule
         return false;
     }
 
+    /**
+     * Alan adi degisikligi panelde karsiligi olmayan bir islemdir.
+     *
+     * update_hosting() adminin domaini degistirmesine izin verir ve yeni degeri
+     * $set_options'a katar (coremio/controllers/admin/orders.php:4338).
+     * - cPanel: hesap eski alan adini sunmaya devam eder, WiseCP yenisini gosterir.
+     *   Kozmetik olarak yanlis ama geri donulebilir; engellemiyoruz.
+     * - Plesk: abonelik domain adiyla bulunuyor. Yeni ad panelde yoksa pleskTargets()
+     *   bir daha asla eslesmez ve SONLANDIRMA dahil her islem kalici olarak basarisiz
+     *   olur; abonelik modul uzerinden silinemez ve bayi kotasini yemeye devam eder.
+     *
+     * @return bool true: devam edilebilir. false: $this->error dolduruldu.
+     */
+    private function allowDomainChange($oldDomain, $newDomain)
+    {
+        try {
+            $isPlesk = $this->panel() === 'plesk';
+        } catch (Throwable $e) {
+            $this->failed($e);
+            return false;
+        }
+
+        if (!$isPlesk) {
+            return true;
+        }
+
+        $this->error = str_replace(
+            array('{old}', '{new}'),
+            array($oldDomain, $newDomain),
+            $this->lang['error-domain-change-plesk']
+        );
+        return false;
+    }
+
     public function apply_options($old_options, $new_options = array())
     {
         $oldConfig = isset($old_options['config']) ? $old_options['config'] : array();
         $newConfig = isset($new_options['config']) ? $new_options['config'] : array();
+
+        $oldDomain = isset($old_options['domain']) ? (string) $old_options['domain'] : '';
+        $newDomain = isset($new_options['domain']) ? (string) $new_options['domain'] : '';
+        if ($oldDomain !== '' && $newDomain !== ''
+            && DNAHosting_Support::domainKey($oldDomain) !== DNAHosting_Support::domainKey($newDomain)
+            && !$this->allowDomainChange($oldDomain, $newDomain)) {
+            return false;
+        }
 
         $newUser = isset($newConfig['user']) ? $newConfig['user'] : '';
         if ($newUser === '') {
             return $new_options;
         }
 
-        $plain = isset($newConfig['password']) ? $newConfig['password'] : '';
-        if ($plain !== '' && $plain !== (isset($oldConfig['password']) ? $oldConfig['password'] : '')) {
-            $this->config['user'] = $newUser;
-            if (!$this->changePassword('', $plain)) {
-                return false;
+        $plain  = isset($newConfig['password']) ? (string) $newConfig['password'] : '';
+        $stored = isset($oldConfig['password']) ? (string) $oldConfig['password'] : '';
+
+        if ($plain === '') {
+            // Alan bos geldi — ornegin kayitli deger cozulemedigi icin form bos cizildi.
+            // Kayitli sifreyi silmek yerine oldugu gibi tasiyoruz.
+            $newConfig['password'] = $stored;
+        } else {
+            // Karsilastirma KODLANMIS taraflar uzerinden yapilir. $plain adminin yazdigi
+            // duz metin, $stored ise get_order()'in cozmeden biraktigi kodlanmis degerdir
+            // (coremio/controllers/admin/orders.php:583) — ikisi asla esit olamaz, yani
+            // duz metni dogrudan karsilastirmak her "Kaydet"te canli panel sifresini
+            // sifirlardi. Crypt::chip() sabit IV kullandigindan encode() belirlenimlidir
+            // ve iki sifreli metni karsilastirmak guvenlidir (coremio/classes/Crypt.php);
+            // cekirdegin kendi cPanel modulu de bunu boyle yapar (cPanel.php:581-583).
+            $encoded = $this->encode_str($plain);
+            if ($encoded !== $stored) {
+                $this->config['user'] = $newUser;
+                if (!$this->changePassword('', $plain)) {
+                    return false;
+                }
             }
-            $newConfig['password'] = $this->encode_str($plain);
+            $newConfig['password'] = $encoded;
         }
 
         // Sifre burada bilerek kodlanmis (encode_str()): apply_options()'un donus degeri
