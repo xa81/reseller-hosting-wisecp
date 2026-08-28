@@ -62,10 +62,39 @@ class DNAHosting_Support
         return implode('', $chars);
     }
 
+    /**
+     * Alan adinin karsilastirma ve arama anahtari: kirpilmis, kucuk harfli, punycode.
+     *
+     * Punycode kismi zorunlu. Cekirdek createAccount()'a ASCII'ye cevrilmis domaini
+     * veriyor — orders.php:2838-2840 idn_to_ascii($orderopt["domain"], 0,
+     * INTL_IDNA_VARIANT_UTS46) diyor — ama sonucu $orderopt["domain"] icine geri
+     * YAZMIYOR. Yani Plesk'te abonelik "xn--..." adiyla acilirken sonraki her islem
+     * domaini options.domain'den Unicode haliyle okuyor. Ayni cevrim burada
+     * yapilmazsa findWebspace() bir IDN siparisini bir daha asla bulamaz ve askiya
+     * alma, askidan indirme, sifre degistirme, paket degistirme, kullanim ve
+     * sonlandirma o hizmet icin kalici olarak coker. cPanel etkilenmez; o config.user
+     * uzerinden calisir.
+     */
     public static function domainKey($domain)
     {
         $domain = rtrim(trim((string) $domain), '.');
-        return function_exists('mb_strtolower') ? mb_strtolower($domain, 'UTF-8') : strtolower($domain);
+        if ($domain === '') {
+            return '';
+        }
+
+        $lower = function_exists('mb_strtolower') ? mb_strtolower($domain, 'UTF-8') : strtolower($domain);
+
+        // Yalnizca ASCII disi girdi cevrilir: zaten ASCII olan (punycode dahil) adlar
+        // oldugu gibi birakilir, boylece mevcut davranis birebir korunur.
+        if (function_exists('idn_to_ascii') && preg_match('/[^\x20-\x7f]/', $lower) === 1) {
+            $variant = defined('INTL_IDNA_VARIANT_UTS46') ? INTL_IDNA_VARIANT_UTS46 : 0;
+            $ascii   = idn_to_ascii($lower, 0, $variant);
+            if (is_string($ascii) && $ascii !== '') {
+                return $ascii;
+            }
+        }
+
+        return $lower;
     }
 
     public static function formatBytes($bytes)

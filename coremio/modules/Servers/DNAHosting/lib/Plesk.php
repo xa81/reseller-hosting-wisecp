@@ -287,6 +287,14 @@ class DNAHosting_Plesk
 
     const OUR_SUSPENSION_BIT = 32;
 
+    /**
+     * Musteriyi ve aboneligi olusturur.
+     *
+     * Yeniden calistirilabilir olacak sekilde yazildi: kosulsuz bir customer.add,
+     * zaman asimina ugrayan ya da yeniden denenen bir saglamada geride oksuz bir
+     * musteri birakir ve sonraki deneme "login zaten var" ile patlar. cPanel yolunda
+     * bunun icin accountSummary kurtarmasi var; Plesk tarafinin karsiligi budur.
+     */
     public function createAccount(array $a)
     {
         // Uretilen hesap sifresi de bir sirdir: kayit edilmezse Http onu
@@ -294,24 +302,60 @@ class DNAHosting_Plesk
         $this->http->addSecret($a['password']);
 
         $plan = $this->resolvePlan($a['plan']);
-        $ip   = $this->firstSharedIp();
 
-        $customerXml = '<customer><add><gen_info>'
+        $customer   = $this->findCustomer($a['external_id']);
+        $customerId = $customer === null
+            ? $this->addCustomer($a)
+            : (int) $customer['id'];
+
+        // Bu domaine ait bir abonelik zaten olabilir ve BASKASININ olabilir: sonlandirilmadan
+        // silinmis eski bir hizmet, elle acilmis bir site, mukerrer bir siparis. Devralmak
+        // yeni musteriye hicbir sey vermeden "basarili" raporlar ve sonlandirma dahil
+        // sonraki her islemi bize ait olmayan canli bir siteye dogrultur.
+        $existing = $this->findWebspace($a['domain']);
+        if ($existing !== null && $existing['owner_id'] !== $customerId) {
+            throw new DNAHosting_Exception(
+                '"' . $a['domain'] . '" icin bu sunucuda zaten bir abonelik var ve baska bir '
+                . 'musteriye ait (owner-id ' . $existing['owner_id'] . '). Devralmayi reddediyoruz.'
+            );
+        }
+
+        $webspaceId = $existing !== null
+            ? (int) $existing['id']
+            : $this->addWebspace($a, $customerId, $plan);
+
+        return array(
+            'username'    => $a['username'],
+            'password'    => $a['password'],
+            'customer_id' => $customerId,
+            'webspace_id' => $webspaceId,
+        );
+    }
+
+    private function addCustomer(array $a)
+    {
+        $packet = $this->request(
+            '<customer><add><gen_info>'
             . '<pname>' . self::esc($a['name']) . '</pname>'
             . '<login>' . self::esc($a['username']) . '</login>'
             . '<passwd>' . self::esc($a['password']) . '</passwd>'
             . '<email>' . self::esc($a['email']) . '</email>'
             . '<external-id>' . self::esc($a['external_id']) . '</external-id>'
-            . '</gen_info></add></customer>';
+            . '</gen_info></add></customer>',
+            'customer.add'
+        );
+        return (int) self::resultOf($packet, 'customer/add')->id;
+    }
 
-        $packet     = $this->request($customerXml, 'customer.add');
-        $customerId = (int) self::resultOf($packet, 'customer/add')->id;
+    private function addWebspace(array $a, $customerId, array $plan)
+    {
+        $ip = $this->firstSharedIp();
 
         // Sira WHMCS 1.6.3.0 sablonuyla birebir: gen_setup, hosting, prefs, plan-name.
         $webspaceXml = '<webspace><add>'
             . '<gen_setup>'
             . '<name>' . self::esc($a['domain']) . '</name>'
-            . '<owner-id>' . $customerId . '</owner-id>'
+            . '<owner-id>' . (int) $customerId . '</owner-id>'
             . '<ip_address>' . self::esc($ip) . '</ip_address>'
             . '<htype>vrt_hst</htype>'
             . '<status>0</status>'
@@ -325,15 +369,40 @@ class DNAHosting_Plesk
             . '<plan-name>' . self::esc($plan['name']) . '</plan-name>'
             . '</add></webspace>';
 
-        $packet      = $this->request($webspaceXml, 'webspace.add');
-        $webspaceId  = (int) self::resultOf($packet, 'webspace/add')->id;
+        try {
+            $packet = $this->request($webspaceXml, 'webspace.add');
+            return (int) self::resultOf($packet, 'webspace/add')->id;
+        } catch (DNAHosting_Exception $e) {
+            if (!self::isResumableAddFailure($e)) {
+                throw $e;
+            }
+            $recovered = $this->findWebspace($a['domain']);
+            if ($recovered === null || $recovered['owner_id'] !== (int) $customerId) {
+                throw $e;
+            }
+            return (int) $recovered['id'];
+        }
+    }
 
-        return array(
-            'username'    => $a['username'],
-            'password'    => $a['password'],
-            'customer_id' => $customerId,
-            'webspace_id' => $webspaceId,
-        );
+    /**
+     * webspace.add hatasinin "arayip devam et" ile kapatilabilir olup olmadigi.
+     *
+     * Yalnizca iki durum bunu hakli kilar: Plesk "zaten var" diyor (onceki bir deneme
+     * buraya kadar gelmis), ya da istek Plesk'in API katmanindan hic yanit alamamis
+     * (kod 0 — zaman asimi, tasima hatasi, HTTP >= 400, bozuk XML): abonelik olusmus
+     * ama yanit kaybolmus olabilir.
+     *
+     * Baska her hata YAYILMALIDIR. Plesk web sunucusunu yapilandirirken patladiginda
+     * geride yarim bir abonelik birakir — o durumda arama BASARILI olur ve gercek hata
+     * kaybolur, yani hostingi olmayan bir abonelik icin "basarili" raporlamis oluruz.
+     */
+    private static function isResumableAddFailure(DNAHosting_Exception $e)
+    {
+        if ($e->getCode() === 0) {
+            return true;
+        }
+        return $e->getCode() === 1007
+            || stripos($e->getMessage(), 'already exists') !== false;
     }
 
     public function webspaceStatus($webspaceId)
@@ -369,23 +438,89 @@ class DNAHosting_Plesk
         return true;
     }
 
-    public function terminate($customerId, $expectedExternalId)
+    /**
+     * Aboneligi siler; musteriyi ancak GUVENLIYSE siler.
+     *
+     * Sahiplik guardi (external-id) musterinin bizim oldugunu kanitlar — cagirmadan once
+     * DNAHosting_Module::pleskTargets() icinde dogrulanir. Ama musterinin YALNIZCA bu
+     * abonelige sahip oldugunu kanitlamaz: panelde ayni musteri altina ikinci bir alan adi
+     * eklenmisse, musteriyi silmek bir WiseCP hizmetini sonlandirirken digerinin sitesini
+     * de sessizce silerdi. Bu yuzden once webspace id ile silinir, sonra musterinin kalan
+     * abonelikleri sayilir ve musteri yalnizca sifirda kaldirilir. Sayim COZULEMEZSE
+     * "bos degil" sayilir.
+     */
+    public function terminate($webspaceId, $customerId, $expectedExternalId)
     {
-        $actual = $this->customerExternalId($customerId);
-        if ($actual !== (string) $expectedExternalId) {
+        $webspaceId = (int) $webspaceId;
+        if ($webspaceId <= 0) {
             throw new DNAHosting_Exception(
-                'Guvenlik nedeniyle silme reddedildi: paneldeki musterinin external-id degeri "'
-                . ($actual !== '' ? $actual : '(bos)') . '", beklenen "' . $expectedExternalId . '". '
-                . 'Bu abonelik bu modul tarafindan olusturulmamis; elle silmeniz gerekir.'
+                'Silme reddedildi: bu hizmet icin bir Plesk abonelik kimligi cozulemedi. '
+                . 'Kimliksiz bir filtre sunucudaki her abonelikle eslesir.'
             );
         }
 
         $packet = $this->request(
-            '<customer><del><filter><id>' . (int) $customerId . '</id></filter></del></customer>',
+            '<webspace><del><filter><id>' . $webspaceId . '</id></filter></del></webspace>',
+            'webspace.del'
+        );
+        try {
+            self::resultOf($packet, 'webspace/del');
+        } catch (DNAHosting_Exception $e) {
+            // 1013 "nesne bulunamadi" zaten varmak istedigimiz son durumdur.
+            if ($e->getCode() !== 1013) {
+                throw $e;
+            }
+        }
+
+        $customerId = (int) $customerId;
+        if ($customerId <= 0) {
+            return true;
+        }
+
+        if ($this->countWebspacesOwnedBy($customerId) > 0) {
+            return true;
+        }
+
+        // Son kapi: silinecek musteri gercekten bizim external-id'mizi tasiyor mu.
+        if ($this->customerExternalId($customerId) !== (string) $expectedExternalId) {
+            return true;
+        }
+
+        $packet = $this->request(
+            '<customer><del><filter><id>' . $customerId . '</id></filter></del></customer>',
             'customer.del'
         );
         self::resultOf($packet, 'customer/del');
         return true;
+    }
+
+    /**
+     * Musteriye ait abonelik sayisi. Sayim cozulemezse 1 doner — yani "bos degil".
+     * Bosluk kanitlanamadan bir musteri silinmez.
+     */
+    private function countWebspacesOwnedBy($customerId)
+    {
+        try {
+            $packet = $this->request(
+                '<webspace><get><filter><owner-id>' . (int) $customerId . '</owner-id></filter>'
+                . '<dataset><gen_info/></dataset></get></webspace>',
+                'webspace.get.byowner'
+            );
+        } catch (DNAHosting_Exception $e) {
+            return 1;
+        }
+
+        if (!isset($packet->webspace->get->result)) {
+            return 1;
+        }
+
+        $count = 0;
+        foreach ($packet->webspace->get->result as $result) {
+            if ((string) $result->status === 'ok') {
+                $count++;
+            }
+        }
+        return $count;
     }
 
     public function changePassword($customerId, $webspaceId, $password)

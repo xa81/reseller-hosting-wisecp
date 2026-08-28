@@ -243,15 +243,34 @@ test('Plesk findWebspace 11003 hatasinda firlatir', function () {
     assertContains('11003', $e->getMessage());
 });
 
-test('Plesk createAccount musteri sonra webspace olusturur', function () {
-    list($p, $t) = dna_plesk();
+/** Bos bir panelde saglama icin beklenen yanit dizisi. */
+function dna_plesk_fresh_create($t)
+{
     $t->push(200, dna_packet('<service-plan><get><result><status>ok</status>'
         . '<name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
+    $t->push(200, dna_packet('<customer><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></customer>'));
+    $t->push(200, dna_packet('<customer><add><result><status>ok</status><id>77</id></result></add></customer>'));
+    $t->push(200, dna_packet('<webspace><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></webspace>'));
     $t->push(200, dna_packet('<ip><get><result><status>ok</status><addresses>'
         . '<ip><ip_address>10.0.0.2</ip_address><type>shared</type></ip>'
         . '</addresses></result></get></ip>'));
-    $t->push(200, dna_packet('<customer><add><result><status>ok</status><id>77</id></result></add></customer>'));
     $t->push(200, dna_packet('<webspace><add><result><status>ok</status><id>9</id></result></add></webspace>'));
+}
+
+function dna_plesk_account($overrides = array())
+{
+    return array_merge(array(
+        'username' => 'ornek1', 'password' => 'Gizli.123!', 'domain' => 'ornek.com',
+        'plan' => 'Pro', 'email' => 'a@b.c', 'name' => 'Ornek Musteri',
+        'external_id' => 'wisecp-501',
+    ), $overrides);
+}
+
+test('Plesk createAccount musteri sonra webspace olusturur', function () {
+    list($p, $t) = dna_plesk();
+    dna_plesk_fresh_create($t);
 
     $r = $p->createAccount(array(
         'username' => 'ornek1', 'password' => 'Gizli.123!', 'domain' => 'ornek.com',
@@ -272,35 +291,120 @@ test('Plesk createAccount musteri sonra webspace olusturur', function () {
 
 test('Plesk createAccount external-id yazar', function () {
     list($p, $t) = dna_plesk();
+    dna_plesk_fresh_create($t);
+    $p->createAccount(dna_plesk_account(array('name' => 'Ornek')));
+    assertContains('<customer><add>', $t->calls[2]['body']);
+    assertContains('<external-id>wisecp-501</external-id>', $t->calls[2]['body']);
+});
+
+test('Plesk createAccount once external-id ile arar, bulursa musteriyi yeniden kullanir', function () {
+    // Zaman asimina ugrayan ya da yeniden denenen bir saglama, kosulsuz customer.add
+    // ile geride oksuz bir musteri birakir; ikinci deneme "login zaten var" ile patlar.
+    list($p, $t) = dna_plesk();
     $t->push(200, dna_packet('<service-plan><get><result><status>ok</status>'
         . '<name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
+    $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
+        . '<data><gen_info><login>ornek1</login></gen_info></data></result></get></customer>'));
+    $t->push(200, dna_packet('<webspace><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></webspace>'));
     $t->push(200, dna_packet('<ip><get><result><status>ok</status><addresses>'
         . '<ip><ip_address>10.0.0.2</ip_address><type>shared</type></ip>'
         . '</addresses></result></get></ip>'));
-    $t->push(200, dna_packet('<customer><add><result><status>ok</status><id>77</id></result></add></customer>'));
     $t->push(200, dna_packet('<webspace><add><result><status>ok</status><id>9</id></result></add></webspace>'));
-    $p->createAccount(array(
-        'username' => 'ornek1', 'password' => 'Gizli.123!', 'domain' => 'ornek.com',
-        'plan' => 'Pro', 'email' => 'a@b.c', 'name' => 'Ornek', 'external_id' => 'wisecp-501',
-    ));
-    assertContains('<external-id>wisecp-501</external-id>', $t->calls[2]['body']);
+
+    $r = $p->createAccount(dna_plesk_account());
+    assertSame(77, $r['customer_id']);
+    assertSame(9, $r['webspace_id']);
+    foreach ($t->calls as $call) {
+        assertSame(false, strpos($call['body'], '<customer><add>'), 'ikinci bir musteri acilmamali');
+    }
+});
+
+test('Plesk createAccount yarim kalan saglamada mevcut webspacei devralir', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<service-plan><get><result><status>ok</status>'
+        . '<name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
+    $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
+        . '<data><gen_info><login>ornek1</login></gen_info></data></result></get></customer>'));
+    $t->push(200, dna_packet('<webspace><get><result><status>ok</status><id>9</id>'
+        . '<data><gen_info><name>ornek.com</name><owner-id>77</owner-id></gen_info></data>'
+        . '</result></get></webspace>'));
+
+    $r = $p->createAccount(dna_plesk_account());
+    assertSame(9, $r['webspace_id']);
+    assertSame(3, count($t->calls), 'webspace zaten varsa yeniden olusturulmamali');
+});
+
+test('Plesk createAccount baskasina ait bir aboneligi devralmayi reddeder', function () {
+    // Devralmak, sonlandirma dahil sonraki her islemi bize ait olmayan canli bir
+    // siteye dogrulturdu.
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<service-plan><get><result><status>ok</status>'
+        . '<name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
+    $t->push(200, dna_packet('<customer><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></customer>'));
+    $t->push(200, dna_packet('<customer><add><result><status>ok</status><id>77</id></result></add></customer>'));
+    $t->push(200, dna_packet('<webspace><get><result><status>ok</status><id>9</id>'
+        . '<data><gen_info><name>ornek.com</name><owner-id>99</owner-id></gen_info></data>'
+        . '</result></get></webspace>'));
+
+    $e = assertThrows(function () use ($p) {
+        $p->createAccount(dna_plesk_account());
+    }, 'baska bir musteriye ait');
+    assertContains('99', $e->getMessage());
+    assertSame(4, count($t->calls), 'webspace.add hic gonderilmemeli');
+});
+
+test('Plesk createAccount yanit kaybolduysa webspacei arayarak kurtarir', function () {
+    // cPanel yolundaki accountSummary kurtarmasinin karsiligi.
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<service-plan><get><result><status>ok</status>'
+        . '<name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
+    $t->push(200, dna_packet('<customer><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></customer>'));
+    $t->push(200, dna_packet('<customer><add><result><status>ok</status><id>77</id></result></add></customer>'));
+    $t->push(200, dna_packet('<webspace><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></webspace>'));
+    $t->push(200, dna_packet('<ip><get><result><status>ok</status><addresses>'
+        . '<ip><ip_address>10.0.0.2</ip_address><type>shared</type></ip>'
+        . '</addresses></result></get></ip>'));
+    $t->pushError('Operation timed out after 300000 milliseconds');
+    $t->push(200, dna_packet('<webspace><get><result><status>ok</status><id>9</id>'
+        . '<data><gen_info><name>ornek.com</name><owner-id>77</owner-id></gen_info></data>'
+        . '</result></get></webspace>'));
+
+    $r = $p->createAccount(dna_plesk_account());
+    assertSame(9, $r['webspace_id']);
+});
+
+test('Plesk createAccount gercek bir webspace.add hatasini yutmaz', function () {
+    // Plesk web sunucusunu yapilandirirken patladiginda geride YARIM bir abonelik
+    // birakir; arama BASARILI olur. Her hatada aramaya duserek devam etmek, hostingi
+    // olmayan bir abonelik icin "basarili" raporlamak olurdu.
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<service-plan><get><result><status>ok</status>'
+        . '<name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
+    $t->push(200, dna_packet('<customer><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></customer>'));
+    $t->push(200, dna_packet('<customer><add><result><status>ok</status><id>77</id></result></add></customer>'));
+    $t->push(200, dna_packet('<webspace><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></webspace>'));
+    $t->push(200, dna_packet('<ip><get><result><status>ok</status><addresses>'
+        . '<ip><ip_address>10.0.0.2</ip_address><type>shared</type></ip>'
+        . '</addresses></result></get></ip>'));
+    $t->push(200, dna_packet('<webspace><add><result><status>error</status><errcode>1023</errcode>'
+        . '<errtext>Failed to configure the web server</errtext></result></add></webspace>'));
+
+    assertThrows(function () use ($p) {
+        $p->createAccount(dna_plesk_account());
+    }, 'Failed to configure the web server');
 });
 
 test('Plesk createAccount webspace.add govdesi sabit sirada kurulur', function () {
     list($p, $t) = dna_plesk();
-    $t->push(200, dna_packet('<service-plan><get><result><status>ok</status>'
-        . '<name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
-    $t->push(200, dna_packet('<ip><get><result><status>ok</status><addresses>'
-        . '<ip><ip_address>10.0.0.2</ip_address><type>shared</type></ip>'
-        . '</addresses></result></get></ip>'));
-    $t->push(200, dna_packet('<customer><add><result><status>ok</status><id>77</id></result></add></customer>'));
-    $t->push(200, dna_packet('<webspace><add><result><status>ok</status><id>9</id></result></add></webspace>'));
+    dna_plesk_fresh_create($t);
 
-    $p->createAccount(array(
-        'username' => 'ornek1', 'password' => 'Gizli.123!', 'domain' => 'ornek.com',
-        'plan' => 'Pro', 'email' => 'a@b.c', 'name' => 'Ornek Musteri',
-        'external_id' => 'wisecp-501',
-    ));
+    $p->createAccount(dna_plesk_account());
 
     $body = $t->lastCall()['body'];
 
@@ -350,26 +454,93 @@ test('Plesk unsuspend yalnizca 32 bitini kaldirir', function () {
     assertContains('<status>16</status>', $t->lastCall()['body'], 'admin askisi korunmali');
 });
 
-test('Plesk terminate external-id tutmuyorsa reddeder', function () {
+test('Plesk terminate abonelik kimligi yoksa hicbir sey silmez', function () {
+    // Kimliksiz bir <filter> sunucudaki HER abonelikle eslesir.
     list($p, $t) = dna_plesk();
-    $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
-        . '<data><gen_info><login>m</login><external-id>baska-sistem-9</external-id></gen_info></data>'
-        . '</result></get></customer>'));
-    $e = assertThrows(function () use ($p) {
-        $p->terminate(77, 'wisecp-501');
-    }, 'silme reddedildi');
-    assertContains('baska-sistem-9', $e->getMessage());
-    assertSame(1, count($t->calls), 'silme istegi hic gonderilmemeli');
+    assertThrows(function () use ($p) {
+        $p->terminate(0, 77, 'wisecp-501');
+    }, 'abonelik kimligi');
+    assertSame(0, count($t->calls), 'hicbir istek gonderilmemeli');
 });
 
-test('Plesk terminate external-id tutuyorsa siler', function () {
+test('Plesk terminate once webspace siler, musteri bossa musteriyi de siler', function () {
     list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><del><result><status>ok</status></result></del></webspace>'));
+    $t->push(200, dna_packet('<webspace><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></webspace>'));
     $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
         . '<data><gen_info><login>m</login><external-id>wisecp-501</external-id></gen_info></data>'
         . '</result></get></customer>'));
     $t->push(200, dna_packet('<customer><del><result><status>ok</status></result></del></customer>'));
-    assertTrue($p->terminate(77, 'wisecp-501'));
-    assertContains('<del>', $t->lastCall()['body']);
+
+    assertTrue($p->terminate(9, 77, 'wisecp-501'));
+    assertSame(4, count($t->calls));
+    assertContains('<webspace><del>', $t->calls[0]['body']);
+    assertContains('<id>9</id>', $t->calls[0]['body']);
+    assertContains('<owner-id>77</owner-id>', $t->calls[1]['body'], 'kalan abonelikler sayilmali');
+    assertContains('<customer><del>', $t->calls[3]['body']);
+});
+
+test('Plesk terminate musterinin baska aboneligi varsa musteriyi silmez', function () {
+    // Sahiplik guardi musterinin BIZIM oldugunu kanitlar; SADECE bu abonelige sahip
+    // oldugunu kanitlamaz. Panelden ikinci bir site eklenmisse, bir WiseCP hizmetini
+    // sonlandirmak digerini de sessizce silerdi.
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><del><result><status>ok</status></result></del></webspace>'));
+    $t->push(200, dna_packet('<webspace><get><result><status>ok</status><id>12</id>'
+        . '<data><gen_info><name>ikinci.com</name><owner-id>77</owner-id></gen_info></data>'
+        . '</result></get></webspace>'));
+
+    assertTrue($p->terminate(9, 77, 'wisecp-501'));
+    assertSame(2, count($t->calls), 'customer.del hic gonderilmemeli');
+    assertSame(false, strpos($t->lastCall()['body'], '<customer>'));
+});
+
+test('Plesk terminate sayim cozulemezse musteriyi silmez', function () {
+    // Bosluk KANITLANAMADIYSA musteri bos sayilmaz.
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><del><result><status>ok</status></result></del></webspace>'));
+    $t->push(200, dna_packet('<system><status>error</status><errcode>11003</errcode>'
+        . '<errtext>The key is not valid for this IP</errtext></system>'));
+
+    assertTrue($p->terminate(9, 77, 'wisecp-501'));
+    assertSame(2, count($t->calls), 'customer.del hic gonderilmemeli');
+});
+
+test('Plesk terminate external-id tutmuyorsa musteriyi silmez', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><del><result><status>ok</status></result></del></webspace>'));
+    $t->push(200, dna_packet('<webspace><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></webspace>'));
+    $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
+        . '<data><gen_info><login>m</login><external-id>baska-sistem-9</external-id></gen_info></data>'
+        . '</result></get></customer>'));
+
+    assertTrue($p->terminate(9, 77, 'wisecp-501'));
+    assertSame(3, count($t->calls), 'customer.del hic gonderilmemeli');
+});
+
+test('Plesk terminate webspace zaten yoksa (1013) devam eder', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><del><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></del></webspace>'));
+    $t->push(200, dna_packet('<webspace><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></webspace>'));
+    $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
+        . '<data><gen_info><login>m</login><external-id>wisecp-501</external-id></gen_info></data>'
+        . '</result></get></customer>'));
+    $t->push(200, dna_packet('<customer><del><result><status>ok</status></result></del></customer>'));
+    assertTrue($p->terminate(9, 77, 'wisecp-501'));
+});
+
+test('Plesk terminate webspace silme gercek hatasini yutmaz', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><del><result><status>error</status><errcode>1023</errcode>'
+        . '<errtext>Operation failed</errtext></result></del></webspace>'));
+    assertThrows(function () use ($p) {
+        $p->terminate(9, 77, 'wisecp-501');
+    }, '1023');
+    assertSame(1, count($t->calls));
 });
 
 test('Plesk changePassword hem panel hem FTP sifresini degistirir', function () {

@@ -195,6 +195,87 @@ test('Modul removeAccount komsu yoksa siler', function () {
     assertContains('removeacct', $t->lastCall()['url']);
 });
 
+/** Plesk tarafinda tespit + findWebspace + customerExternalId ucusunu kurar. */
+function dna_plesk_targets($t, $externalId = 'wisecp-501')
+{
+    $t->push(200, '<?xml version="1.0"?><packet><server><get><result>'
+        . '<status>ok</status></result></get></server></packet>');
+    $t->push(200, '<?xml version="1.0"?><packet><webspace><get><result><status>ok</status><id>9</id>'
+        . '<data><gen_info><name>ornek.com</name><owner-id>77</owner-id></gen_info></data>'
+        . '</result></get></webspace></packet>');
+    $t->push(200, '<?xml version="1.0"?><packet><customer><get><result><status>ok</status><id>77</id>'
+        . '<data><gen_info><login>m</login><external-id>' . $externalId . '</external-id></gen_info></data>'
+        . '</result></get></customer></packet>');
+}
+
+test('Modul Plesk suspend yabanci external-idli aboneligi reddeder ve webspace.set gondermez', function () {
+    // findWebspace() domaine ait HANGI abonelik varsa onu dondurur; owner-id dogrudan
+    // customer_id oluyordu. Sahiplik yalnizca terminate() icinde kontrol ediliyordu,
+    // yani suspend/unsuspend/changePassword/changePlan/usage baska bir musterinin
+    // canli sitesine yazabiliyordu.
+    list($m, $t) = dna_module_n(8443, function ($t) {
+        dna_plesk_targets($t, 'baska-sistem-9');
+    });
+    $m->options['domain'] = 'ornek.com';
+    assertSame(false, $m->suspend());
+    assertContains('baska-sistem-9', $m->error);
+    assertSame(3, count($t->calls), 'tespit + webspace.get + customer.get; baskasi olmamali');
+    foreach ($t->calls as $call) {
+        assertSame(false, strpos((string) $call['body'], '<webspace><set>'), 'webspace.set gonderilmemeli');
+    }
+});
+
+test('Modul Plesk suspend external-id tutuyorsa calisir', function () {
+    list($m, $t) = dna_module_n(8443, function ($t) {
+        dna_plesk_targets($t);
+        $t->push(200, '<?xml version="1.0"?><packet><webspace><get><result><status>ok</status>'
+            . '<data><gen_info><status>0</status></gen_info></data></result></get></webspace></packet>');
+        $t->push(200, '<?xml version="1.0"?><packet><webspace><set><result><status>ok</status>'
+            . '</result></set></webspace></packet>');
+    });
+    $m->options['domain'] = 'ornek.com';
+    assertTrue($m->suspend(), 'error: ' . $m->error);
+    assertContains('<status>32</status>', $t->lastCall()['body']);
+});
+
+test('Modul Plesk sahiplik dogrulamasini istek icinde bir kez yapar', function () {
+    list($m, $t) = dna_module_n(8443, function ($t) {
+        dna_plesk_targets($t);
+        $t->push(200, '<?xml version="1.0"?><packet><webspace><get><result><status>ok</status>'
+            . '<data><gen_info><status>0</status></gen_info></data></result></get></webspace></packet>');
+        $t->push(200, '<?xml version="1.0"?><packet><webspace><set><result><status>ok</status>'
+            . '</result></set></webspace></packet>');
+        $t->push(200, '<?xml version="1.0"?><packet><webspace><get><result><status>ok</status>'
+            . '<data><gen_info><status>32</status></gen_info></data></result></get></webspace></packet>');
+        $t->push(200, '<?xml version="1.0"?><packet><webspace><set><result><status>ok</status>'
+            . '</result></set></webspace></packet>');
+    });
+    $m->options['domain'] = 'ornek.com';
+    assertTrue($m->suspend(), 'error: ' . $m->error);
+    assertTrue($m->unsuspend(), 'error: ' . $m->error);
+    assertSame(7, count($t->calls), 'sahiplik dogrulamasi ezberlenmis olmali');
+});
+
+test('Modul Plesk removeAccount dogrulanmis abonelik ve musteri kimligini gecirir', function () {
+    list($m, $t) = dna_module_n(8443, function ($t) {
+        dna_plesk_targets($t);
+        $t->push(200, '<?xml version="1.0"?><packet><webspace><del><result><status>ok</status>'
+            . '</result></del></webspace></packet>');
+        $t->push(200, '<?xml version="1.0"?><packet><webspace><get><result><status>error</status>'
+            . '<errcode>1013</errcode><errtext>Object not found</errtext></result></get></webspace></packet>');
+        $t->push(200, '<?xml version="1.0"?><packet><customer><get><result><status>ok</status><id>77</id>'
+            . '<data><gen_info><login>m</login><external-id>wisecp-501</external-id></gen_info></data>'
+            . '</result></get></customer></packet>');
+        $t->push(200, '<?xml version="1.0"?><packet><customer><del><result><status>ok</status>'
+            . '</result></del></customer></packet>');
+    });
+    $m->options['domain'] = 'ornek.com';
+    assertTrue($m->removeAccount(), 'error: ' . $m->error);
+    assertContains('<webspace><del>', $t->calls[3]['body']);
+    assertContains('<id>9</id>', $t->calls[3]['body']);
+    assertContains('<customer><del>', $t->lastCall()['body']);
+});
+
 test('Modul change_plan bos plani sessizce gecer', function () {
     list($m, $t) = dna_module_n(2087, function ($t) {
         $t->push(200, '{"metadata":{"result":1},"data":{"acct":[]}}');

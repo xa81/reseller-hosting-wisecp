@@ -288,18 +288,43 @@ class DNAHosting_Module extends ServerModule
         }
     }
 
-    /** Plesk islemleri icin abonelik kimligini domainden yeniden turetir. */
+    /**
+     * Plesk islemleri icin abonelik + musteri kimligini domainden yeniden turetir ve
+     * cifti SAHIPLIK ACISINDAN DOGRULAR.
+     *
+     * §2.5 geregi Plesk'in id'lerini siparise yazamiyoruz, bu yuzden kimlik her istekte
+     * yeniden bulunuyor. findWebspace() ise o alan adini tasiyan HANGI abonelik varsa onu
+     * dondurur — sahiplik hakkinda hicbir sey soylemez. Dogrulama yalnizca terminate()
+     * icinde yapilirken suspend(), unsuspend(), changePassword(), changePlan() ve usage()
+     * korumasizdi; en somut zarar changePassword()'dur, cunku hem Plesk musterisinin
+     * giris sifresini hem webspace'in FTP sifresini o alan adi HANGI abonelige cozuluyorsa
+     * onun uzerinde sifirlar.
+     *
+     * Dogrulama burada bir kez yapilir ve dogrulanmis cift ezberlenir; bes islem de guardi
+     * miras alir.
+     */
     private function pleskTargets()
     {
         if (isset($this->storage['plesk_targets'])) {
             return $this->storage['plesk_targets'];
         }
 
+        $driver   = $this->driver();
         $domain   = DNAHosting_Support::domainKey($this->orderDomain());
-        $webspace = $this->driver()->findWebspace($domain);
+        $webspace = $driver->findWebspace($domain);
         if (!$webspace) {
             throw new DNAHosting_Exception(
                 '"' . $domain . '" alan adina ait abonelik panelde bulunamadi.'
+            );
+        }
+
+        $expected = $this->externalId();
+        $actual   = $driver->customerExternalId($webspace['owner_id']);
+        if ($actual !== (string) $expected) {
+            throw new DNAHosting_Exception(
+                'Guvenlik nedeniyle islem reddedildi: "' . $domain . '" alan adina ait abonelik'
+                . ' bu modul tarafindan olusturulmamis. Paneldeki musterinin external-id degeri "'
+                . ($actual !== '' ? $actual : '(bos)') . '", beklenen "' . $expected . '".'
             );
         }
 
@@ -372,8 +397,10 @@ class DNAHosting_Module extends ServerModule
             }
 
             if ($this->panel() === 'plesk') {
+                // Sahiplik guardi pleskTargets() icinde calisti; terminate() external-id'yi
+                // yalnizca MUSTERIYI silmeden onceki son kapi olarak yeniden dogrular.
                 $t = $this->pleskTargets();
-                return $this->driver()->terminate($t['customer_id'], $this->externalId());
+                return $this->driver()->terminate($t['webspace_id'], $t['customer_id'], $this->externalId());
             }
             return $this->driver()->terminateAccount($user ? $user : $this->panelUser());
         } catch (Exception $e) {

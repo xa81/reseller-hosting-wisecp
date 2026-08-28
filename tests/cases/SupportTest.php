@@ -31,6 +31,27 @@ test('domainKey normalize eder', function () {
     assertSame('ornek.com', DNAHosting_Support::domainKey('Ornek.Com'));
 });
 
+test('domainKey IDN alan adini punycodea cevirir', function () {
+    // Cekirdek createAccount()'a punycode veriyor (coremio/helpers/orders.php:2838-2840)
+    // ama bunu options.domain'e geri YAZMIYOR. Ayni normalizasyon burada yapilmazsa
+    // findWebspace() bir IDN siparisini bir daha asla bulamaz ve askiya alma, sifre
+    // degistirme, paket degistirme, kullanim ve sonlandirma kalici olarak coker.
+    if (!function_exists('idn_to_ascii')) {
+        return;
+    }
+    assertSame('xn--rnek-4qa.com', DNAHosting_Support::domainKey('Örnek.com'));
+    assertSame('xn--mnchen-3ya.de', DNAHosting_Support::domainKey('  MÜNCHEN.de. '));
+});
+
+test('domainKey zaten punycode olan adi bozmaz', function () {
+    assertSame('xn--rnek-4qa.com', DNAHosting_Support::domainKey('XN--RNEK-4QA.com'));
+});
+
+test('domainKey bos girdide bos doner', function () {
+    assertSame('', DNAHosting_Support::domainKey(''));
+    assertSame('', DNAHosting_Support::domainKey('   '));
+});
+
 test('formatBytes okunabilir cikti verir', function () {
     assertSame('∞', DNAHosting_Support::formatBytes(0));
     assertSame('1 KB', DNAHosting_Support::formatBytes(1024));
