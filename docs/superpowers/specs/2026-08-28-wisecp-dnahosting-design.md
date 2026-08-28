@@ -409,7 +409,7 @@ Bu maddeler tasarımla kapatılamaz; canlı sunucuda doğrulanmaları gerekir.
 |---|---|---|
 | 1 | **Plesk askı bitmask'ı.** Bizim WHMCS modülümüz 32 (reseller askısı) kullanıyor; WiseCP'nin kendi Plesk modülü root olmayan sahip için 1 kullanıyor (`Plesk.php:1227`). **Hiçbiri canlıda doğrulanmadı** — WHMCS tarafında suspend/unsuspend hiç çalıştırılmadı. 32 ile gidiyoruz. | Bir test hesabını askıya al, panelde durumu ve sitenin gerçekten kapandığını gör, askıyı kaldır, geri döndüğünü gör |
 | 2 | `Cache::retrieve()` gerçekten veri döndürüyor mu (bkz. §2.10) | Uygulamanın ilk adımı; döndürmüyorsa `Cache` bırakılır |
-| 3 | İstemci IP'sini almanın WiseCP'deki doğru yolu | SSO uygulanırken doğrulanır |
+| 3 | ~~İstemci IP'sini almanın WiseCP'deki doğru yolu~~ **Kapandı.** `UserManager::GetIP()` (`coremio/classes/UserManager.php:388`) doğru yöntem; `DNAHosting.php::clientIp()` bunu kullanıyor ve `IP` doğrulamasından geçmeyen sonuçları eler. | ~~SSO uygulanırken doğrulanır~~ Doğrulandı |
 | 4 | `getPlans()` dönüş şeklinin ürün formunda beklenen anahtarlarla uyumu | Form render edilerek görülür |
 | 5 | Terminate, SSO ve kullanım yolları **WHMCS tarafında da hiç canlı çalıştırılmadı** | İki modül için de aynı canlı test turu gerekir |
 
