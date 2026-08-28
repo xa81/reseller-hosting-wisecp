@@ -7,7 +7,10 @@
     $ftp      = isset($options["ftp_info"]) ? $options["ftp_info"] : array();
     $domain   = isset($options["domain"]) ? $options["domain"] : '';
     $server   = isset($server) ? $server : array();
-    $panelUrl = ($server["secure"] ? 'https' : 'http') . '://' . $server["ip"] . ':' . $server["port"];
+    $secure   = isset($server["secure"]) ? $server["secure"] : false;
+    $ip       = isset($server["ip"]) ? $server["ip"] : '';
+    $port     = isset($server["port"]) ? $server["port"] : 0;
+    $panelUrl = ($secure ? 'https' : 'http') . '://' . $ip . ':' . $port;
     $esc      = function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
 ?>
 <table cellpadding="6" cellspacing="0" border="0">

@@ -30,9 +30,9 @@
         <?php else: ?>
             <select name="module_data[plan]" id="module_data_plan">
                 <?php foreach ($plans as $plan): ?>
-                    <option value="<?php echo htmlspecialchars($plan["name"], ENT_QUOTES, 'UTF-8'); ?>"
+                    <option value="<?php echo htmlspecialchars((string) $plan["name"], ENT_QUOTES, 'UTF-8'); ?>"
                         <?php echo $plan["name"] === $selected ? ' selected' : ''; ?>>
-                        <?php echo htmlspecialchars($plan["name"], ENT_QUOTES, 'UTF-8'); ?>
+                        <?php echo htmlspecialchars((string) $plan["name"], ENT_QUOTES, 'UTF-8'); ?>
                     </option>
                 <?php endforeach; ?>
             </select>
