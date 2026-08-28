@@ -9,6 +9,7 @@ class DNAHosting_Plesk
     private $http;
     private $authMode = 'key';
     private $authSettled = false;
+    private $plans = null;
 
     public function __construct(array $server, DNAHosting_Http $http)
     {
@@ -139,5 +140,139 @@ class DNAHosting_Plesk
         $packet = $this->request('<server><get><gen_info/></get></server>', 'server.get');
         self::resultOf($packet, 'server/get');
         return true;
+    }
+
+    public function listPlans()
+    {
+        if ($this->plans !== null) {
+            return $this->plans;
+        }
+
+        $packet = $this->request(
+            '<service-plan><get><filter/></get></service-plan>',
+            'service-plan.get'
+        );
+
+        $list = array();
+        if (isset($packet->{'service-plan'}->get->result)) {
+            foreach ($packet->{'service-plan'}->get->result as $result) {
+                if ((string) $result->status !== 'ok') {
+                    continue;
+                }
+                $list[] = array(
+                    'name' => (string) $result->name,
+                    'guid' => (string) $result->guid,
+                );
+            }
+        }
+
+        $this->plans = $list;
+        return $list;
+    }
+
+    public function resolvePlan($configured)
+    {
+        $configured = trim((string) $configured);
+        if ($configured === '') {
+            throw new DNAHosting_Exception('Urun icin bir plan secilmemis.');
+        }
+
+        $plans = $this->listPlans();
+        $names = array();
+        foreach ($plans as $plan) {
+            $names[] = $plan['name'];
+            if (strcasecmp($plan['name'], $configured) === 0) {
+                return $plan;
+            }
+        }
+
+        throw new DNAHosting_Exception(
+            '"' . $configured . '" plani sunucuda bulunamadi. Mevcut planlar: '
+            . ($names ? implode(', ', $names) : '(hic plan yok)')
+        );
+    }
+
+    public function firstSharedIp()
+    {
+        $packet = $this->request('<ip><get/></ip>', 'ip.get');
+        $result = self::resultOf($packet, 'ip/get');
+
+        if (isset($result->addresses->ip)) {
+            foreach ($result->addresses->ip as $row) {
+                if (strcasecmp((string) $row->type, 'shared') === 0) {
+                    $address = trim((string) $row->ip_address);
+                    if ($address !== '') {
+                        return $address;
+                    }
+                }
+            }
+        }
+
+        return (string) $this->server['ip'];
+    }
+
+    public function findCustomer($externalId)
+    {
+        $packet = $this->request(
+            '<customer><get><filter><external-id>' . self::esc($externalId) . '</external-id></filter>'
+            . '<dataset><gen_info/></dataset></get></customer>',
+            'customer.get'
+        );
+
+        try {
+            $result = self::resultOf($packet, 'customer/get');
+        } catch (DNAHosting_Exception $e) {
+            return null;
+        }
+
+        return array(
+            'id'    => (int) $result->id,
+            'login' => (string) $result->data->gen_info->login,
+        );
+    }
+
+    public function customerExternalId($customerId)
+    {
+        $packet = $this->request(
+            '<customer><get><filter><id>' . (int) $customerId . '</id></filter>'
+            . '<dataset><gen_info/></dataset></get></customer>',
+            'customer.get'
+        );
+
+        try {
+            $result = self::resultOf($packet, 'customer/get');
+        } catch (DNAHosting_Exception $e) {
+            return '';
+        }
+
+        return isset($result->data->gen_info->{'external-id'})
+            ? (string) $result->data->gen_info->{'external-id'}
+            : '';
+    }
+
+    public function findWebspace($domain)
+    {
+        $packet = $this->request(
+            '<webspace><get><filter><name>' . self::esc($domain) . '</name></filter>'
+            . '<dataset><gen_info/></dataset></get></webspace>',
+            'webspace.get'
+        );
+
+        try {
+            $result = self::resultOf($packet, 'webspace/get');
+        } catch (DNAHosting_Exception $e) {
+            return null;
+        }
+
+        return array(
+            'id'       => (int) $result->id,
+            'name'     => (string) $result->data->gen_info->name,
+            'owner_id' => (int) $result->data->gen_info->{'owner-id'},
+        );
+    }
+
+    public static function esc($value)
+    {
+        return htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
     }
 }

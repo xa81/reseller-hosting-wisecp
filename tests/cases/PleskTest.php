@@ -136,3 +136,82 @@ test('Plesk dusus hatasini ayirt eder', function () {
     }, '1015');
     assertSame(1, count($t->calls));
 });
+
+test('Plesk listPlans ad ve guid dondurur', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<service-plan><get>'
+        . '<result><status>ok</status><id>1</id><name>Baslangic</name><guid>g-1</guid></result>'
+        . '<result><status>ok</status><id>2</id><name>Pro</name><guid>g-2</guid></result>'
+        . '</get></service-plan>'));
+    $plans = $p->listPlans();
+    assertSame(2, count($plans));
+    assertSame('Baslangic', $plans[0]['name']);
+    assertSame('g-2', $plans[1]['guid']);
+});
+
+test('Plesk resolvePlan buyuk kucuk harf gozetmez', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<service-plan><get>'
+        . '<result><status>ok</status><name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
+    assertSame('g-2', $p->resolvePlan('pro')['guid']);
+});
+
+test('Plesk resolvePlan bulunamayinca mevcutlari listeler', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<service-plan><get>'
+        . '<result><status>ok</status><name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
+    $e = assertThrows(function () use ($p) { $p->resolvePlan('yok'); }, 'yok');
+    assertContains('Pro', $e->getMessage());
+});
+
+test('Plesk firstSharedIp yalnizca shared adresi secer', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<ip><get><result><status>ok</status><addresses>'
+        . '<ip><ip_address>10.0.0.1</ip_address><type>exclusive</type></ip>'
+        . '<ip><ip_address>10.0.0.2</ip_address><type>shared</type></ip>'
+        . '</addresses></result></get></ip>'));
+    assertSame('10.0.0.2', $p->firstSharedIp());
+});
+
+test('Plesk firstSharedIp hicbiri paylasimli degilse sunucu IPsine duser', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<ip><get><result><status>ok</status><addresses>'
+        . '<ip><ip_address>10.0.0.1</ip_address><type>exclusive</type></ip>'
+        . '</addresses></result></get></ip>'));
+    assertSame('5.6.7.8', $p->firstSharedIp());
+});
+
+test('Plesk findCustomer external-id ile filtreler', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
+        . '<data><gen_info><login>musteri77</login></gen_info></data></result></get></customer>'));
+    $c = $p->findCustomer('wisecp-501');
+    assertSame(77, $c['id']);
+    assertSame('musteri77', $c['login']);
+    assertContains('<external-id>wisecp-501</external-id>', $t->lastCall()['body']);
+});
+
+test('Plesk findCustomer yoksa null doner', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<customer><get><result><status>error</status><errcode>1013</errcode>'
+        . '<errtext>Object not found</errtext></result></get></customer>'));
+    assertSame(null, $p->findCustomer('wisecp-yok'));
+});
+
+test('Plesk findWebspace domain ile bulur', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<webspace><get><result><status>ok</status><id>9</id>'
+        . '<data><gen_info><name>ornek.com</name><owner-id>77</owner-id></gen_info></data>'
+        . '</result></get></webspace>'));
+    $w = $p->findWebspace('ornek.com');
+    assertSame(9, $w['id']);
+    assertSame('ornek.com', $w['name']);
+    assertSame(77, $w['owner_id']);
+});
+
+test('Plesk customerExternalId kayitli degilse bos dize doner', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<customer><get><result><status>ok</status><id>77</id>'
+        . '<data><gen_info><login>musteri77</login></gen_info></data></result></get></customer>'));
+    assertSame('', $p->customerExternalId(77));
+});
