@@ -286,6 +286,52 @@ test('Plesk createAccount external-id yazar', function () {
     assertContains('<external-id>wisecp-501</external-id>', $t->calls[2]['body']);
 });
 
+test('Plesk createAccount webspace.add govdesi sabit sirada kurulur', function () {
+    list($p, $t) = dna_plesk();
+    $t->push(200, dna_packet('<service-plan><get><result><status>ok</status>'
+        . '<name>Pro</name><guid>g-2</guid></result></get></service-plan>'));
+    $t->push(200, dna_packet('<ip><get><result><status>ok</status><addresses>'
+        . '<ip><ip_address>10.0.0.2</ip_address><type>shared</type></ip>'
+        . '</addresses></result></get></ip>'));
+    $t->push(200, dna_packet('<customer><add><result><status>ok</status><id>77</id></result></add></customer>'));
+    $t->push(200, dna_packet('<webspace><add><result><status>ok</status><id>9</id></result></add></webspace>'));
+
+    $p->createAccount(array(
+        'username' => 'ornek1', 'password' => 'Gizli.123!', 'domain' => 'ornek.com',
+        'plan' => 'Pro', 'email' => 'a@b.c', 'name' => 'Ornek Musteri',
+        'external_id' => 'wisecp-501',
+    ));
+
+    $body = $t->lastCall()['body'];
+
+    $posGenSetup = strpos($body, '<gen_setup>');
+    $posHosting  = strpos($body, '<hosting>');
+    $posPrefs    = strpos($body, '<prefs>');
+    $posPlanName = strpos($body, '<plan-name>');
+    assertTrue($posGenSetup !== false, '<gen_setup> bulunamadi');
+    assertTrue($posHosting !== false, '<hosting> bulunamadi');
+    assertTrue($posPrefs !== false, '<prefs> bulunamadi');
+    assertTrue($posPlanName !== false, '<plan-name> bulunamadi');
+    assertTrue($posGenSetup < $posHosting, 'gen_setup hosting dan once gelmeli');
+    assertTrue($posHosting < $posPrefs, 'hosting prefs dan once gelmeli');
+    assertTrue($posPrefs < $posPlanName, 'prefs plan-name dan once gelmeli');
+
+    $posName    = strpos($body, '<name>', $posGenSetup);
+    $posOwnerId = strpos($body, '<owner-id>', $posGenSetup);
+    $posIp      = strpos($body, '<ip_address>', $posGenSetup);
+    $posHtype   = strpos($body, '<htype>', $posGenSetup);
+    $posStatus  = strpos($body, '<status>', $posGenSetup);
+    assertTrue($posName !== false, 'gen_setup/name bulunamadi');
+    assertTrue($posOwnerId !== false, 'gen_setup/owner-id bulunamadi');
+    assertTrue($posIp !== false, 'gen_setup/ip_address bulunamadi');
+    assertTrue($posHtype !== false, 'gen_setup/htype bulunamadi');
+    assertTrue($posStatus !== false, 'gen_setup/status bulunamadi');
+    assertTrue($posName < $posOwnerId, 'name owner-id dan once gelmeli');
+    assertTrue($posOwnerId < $posIp, 'owner-id ip_address dan once gelmeli');
+    assertTrue($posIp < $posHtype, 'ip_address htype dan once gelmeli');
+    assertTrue($posHtype < $posStatus, 'htype status dan once gelmeli');
+});
+
 test('Plesk suspend mevcut duruma 32 bitini ekler', function () {
     list($p, $t) = dna_plesk();
     $t->push(200, dna_packet('<webspace><get><result><status>ok</status>'
