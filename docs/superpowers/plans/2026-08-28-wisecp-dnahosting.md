@@ -1422,7 +1422,7 @@ class DNAHosting_Plesk
 php tests/run.php
 ```
 
-Beklenen: `41 gecti, 0 kaldi`
+Beklenen: `43 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -1690,7 +1690,7 @@ Sınıfın özellik bildirimlerine `private $plans = null;` ekle.
 php tests/run.php
 ```
 
-Beklenen: `50 gecti, 0 kaldi`
+Beklenen: `55 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -2068,7 +2068,7 @@ Beklenen: `Call to undefined method DNAHosting_Plesk::createAccount()`
 php tests/run.php
 ```
 
-Beklenen: `60 gecti, 0 kaldi`
+Beklenen: `65 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -2346,7 +2346,7 @@ class DNAHosting_Detector
 php tests/run.php
 ```
 
-Beklenen: `68 gecti, 0 kaldi`
+Beklenen: `73 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -2511,7 +2511,7 @@ class DNAHosting_Support
 php tests/run.php
 ```
 
-Beklenen: `73 gecti, 0 kaldi`
+Beklenen: `78 gecti, 0 kaldi`
 
 - [ ] **Step 5: `config.php`, `init.php` ve dil dosyalarını yaz**
 
@@ -2957,7 +2957,7 @@ class DNAHosting_Module extends ServerModule
 php tests/run.php
 ```
 
-Beklenen: `81 gecti, 0 kaldi`
+Beklenen: `86 gecti, 0 kaldi`
 
 - [ ] **Step 10: Commit**
 
@@ -3414,7 +3414,7 @@ Aşağıdakileri sınıfa ekle:
 php tests/run.php
 ```
 
-Beklenen: `90 gecti, 0 kaldi`
+Beklenen: `95 gecti, 0 kaldi`
 
 - [ ] **Step 5: Commit**
 
@@ -3762,7 +3762,7 @@ Aşağıdakileri sınıfa ekle (Task 9 geçici bir sonda bırakmadı — `DNAHos
 php tests/run.php
 ```
 
-Beklenen: `98 gecti, 0 kaldi`
+Beklenen: `103 gecti, 0 kaldi`
 
 - [ ] **Step 7: Commit**
 
@@ -3930,7 +3930,7 @@ Beklenen: her dosya için `No syntax errors detected`
 php tests/run.php
 ```
 
-Beklenen: `98 gecti, 0 kaldi`
+Beklenen: `103 gecti, 0 kaldi`
 
 - [ ] **Step 6: Commit**
 
@@ -3974,7 +3974,7 @@ Beklenen: **hiçbir çıktı yok.** Çıktı veren her dosya guard'dan yoksundur
 php tests/run.php
 ```
 
-Beklenen: `98 gecti, 0 kaldi`
+Beklenen: `103 gecti, 0 kaldi`
 
 - [ ] **Step 4: `README.md` yaz**
 
