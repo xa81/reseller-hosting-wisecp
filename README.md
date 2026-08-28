@@ -6,7 +6,7 @@ One module, two panels. Point it at a server and it figures out on its own wheth
 runs cPanel/WHM or Plesk — you never set a panel type by hand.
 
 ![WiseCP](https://img.shields.io/badge/WiseCP-self--hosted-4A90D9?style=flat-square)
-![PHP](https://img.shields.io/badge/PHP-7.2%20%E2%80%93%208.4-777BB4?style=flat-square&logo=php&logoColor=white)
+![PHP](https://img.shields.io/badge/PHP-7.4%20%E2%80%93%208.4-777BB4?style=flat-square&logo=php&logoColor=white)
 ![cPanel](https://img.shields.io/badge/cPanel%2FWHM-supported-FF6C2C?style=flat-square)
 ![Plesk](https://img.shields.io/badge/Plesk-supported-53BCE6?style=flat-square)
 ![License](https://img.shields.io/badge/license-proprietary-lightgrey?style=flat-square)
@@ -87,15 +87,15 @@ screen.
 | **IP Address** | The panel server's actual address — this is what the module connects to |
 | **Username** | Your reseller username on that panel |
 | **Password** | **cPanel:** a WHM API token. **Plesk:** either an API secret key or the reseller's panel password |
-| **Access Hash** | Leave empty — this module never reads it |
+| **Access Hash** | Not shown — this field stays hidden for DNAHosting servers |
 | **Port** | `2087` for cPanel, `8443` for Plesk (the form defaults to the cPanel port; change it for a Plesk server) |
 | **SSL** | Checked |
 
 Two details that are easy to miss:
 
 - **The credential always goes in the Password field, on both panels.** WiseCP stores that field
-  encrypted and shows the "Access Hash" field as plain text with a core-supplied label the module
-  can't rename — which is exactly why it's not used here.
+  encrypted. This module doesn't use the "Access Hash" field at all — it stays hidden on the form
+  and never appears for a DNAHosting server.
 - **The port only decides which panel is probed first.** `8443`/`8880` makes the module try Plesk
   first, anything else tries cPanel first — but it always confirms with a real API call and falls
   back to the other panel if the first guess doesn't answer. A wrong port slows detection down; it
@@ -150,7 +150,7 @@ you're using.
 
 ## Defining the product
 
-**Services → Hosting Management → Hosting Packages → Add New**
+**Services → Hosting Management → Hosting Packages → Create New Package**
 
 Under **Server Selection**, choose **Single Server** and pick the DNAHosting server you added (if
 you use a server group instead, the module still renders its form against one concrete server in
@@ -189,7 +189,7 @@ response.
 
 ## Logs
 
-**Tools → Activity Logs → Module Activity Log**
+**Tools → Process Logs → Module Activity Log**
 
 Every request the module sends and every response it receives is recorded here, tagged with the
 action (e.g. `createacct`, `webspace.add`). Logging only happens while the **Module Activity Log**
