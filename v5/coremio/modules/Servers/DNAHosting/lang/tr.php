@@ -1,7 +1,7 @@
 <?php
     return [
         'name'                       => "DNA Reseller Hosting",
-        'description'                => "cPanel/WHM ya da Plesk bayi hesabınızdan paylaşımlı hosting satın. Panel tipi kendiliğinden tespit edilir; root erişimi gerekmez.",
+        'description'                => "DomainNameAPI'nin sağladığı cPanel/WHM ya da Plesk bayi hesabınızdan hosting satın. Panel tipi kendiliğinden tespit edilir; root erişimi gerekmez.",
         'config-plan'                => "Paket / Plan",
         'config-plan-desc'           => "Hesabın açılacağı paket (cPanel) ya da hizmet planı (Plesk). Hesaplar bayi kotanızın içinde açılır.",
         'panel-cpanel'               => "cPanel / WHM",

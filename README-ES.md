@@ -16,7 +16,7 @@
 
 # DNA Reseller Hosting
 
-**Gestione cuentas de revendedor de cPanel y Plesk desde un único módulo de servidor de WiseCP.**
+**Gestione las cuentas de hosting de revendedor de cPanel y Plesk que proporciona DomainNameAPI desde un único módulo de servidor de WiseCP.**
 
 Un módulo, dos paneles. Usted nunca elige el tipo de panel: el módulo se lo pregunta al servidor y
 recuerda qué panel respondió.
@@ -55,8 +55,11 @@ recuerda qué panel respondió.
 | Uso de disco y tráfico para facturación por consumo | ✅ | ✅ |
 | Acceso al panel de control con un clic | ✅ | ✅ |
 
-> 💡 **Pensado para revendedores.** No necesita acceso root ni de administrador; el módulo trabaja
-> con los permisos de su propia cuenta de revendedor, y cada cuenta que crea consume su cuota.
+> 💡 **Pensado para el hosting de revendedor de DomainNameAPI.** El módulo está hecho para las cuentas
+> de revendedor de cPanel/WHM y Plesk que proporciona DomainNameAPI. No necesita acceso root ni de
+> administrador; trabaja con los permisos de su cuenta de revendedor de DomainNameAPI, y cada cuenta
+> que crea consume su cuota. ¿Aún no tiene una cuenta de hosting de revendedor? Obtenga una en
+> [dm.domainnameapi.com/hosting](https://dm.domainnameapi.com/hosting).
 
 ---
 
@@ -65,8 +68,8 @@ recuerda qué panel respondió.
 - **WiseCP 5** o **WiseCP 3** en su propio servidor, con acceso de administrador; cada uno tiene su propio paquete
 - **PHP** 8.2 o superior en WiseCP 5, como exige WiseCP 5; 7.4 – 8.4 en WiseCP 3
 - Extensiones de PHP: las que WiseCP 5 ya exige, más `simplexml` (activada en las compilaciones estándar de PHP)
-- Una **cuenta de revendedor de cPanel/WHM** (token de la API de WHM) &nbsp;o&nbsp; una **cuenta de
-  revendedor de Plesk** (clave secreta o la contraseña del panel)
+- Una **cuenta de hosting de revendedor de DomainNameAPI**: cPanel/WHM (WHM API token) &nbsp;o&nbsp; Plesk
+  (clave secreta o la contraseña del panel)
 - Acceso saliente desde el servidor de WiseCP al servidor del panel, en el puerto de la API del panel
 
 > ✅ No se crea ninguna tabla en la base de datos, no hace falta cron y no hay dependencias de

@@ -16,7 +16,7 @@
 
 # DNA Reseller Hosting
 
-**Verwalten Sie cPanel- und Plesk-Reseller-Konten aus einem einzigen WiseCP-Servermodul.**
+**Verwalten Sie die von DomainNameAPI bereitgestellten cPanel- und Plesk-Reseller-Hosting-Konten aus einem einzigen WiseCP-Servermodul.**
 
 Ein Modul, zwei Panels. Sie wählen den Paneltyp nie aus — das Modul fragt den Server selbst und
 merkt sich, welches Panel geantwortet hat.
@@ -55,8 +55,11 @@ merkt sich, welches Panel geantwortet hat.
 | Speicher- und Traffic-Verbrauch für verbrauchsabhängige Abrechnung | ✅ | ✅ |
 | Ein-Klick-Login ins Control Panel | ✅ | ✅ |
 
-> 💡 **Für Reseller gebaut.** Root- oder Admin-Zugang ist nicht nötig; das Modul arbeitet mit den
-> Rechten Ihres eigenen Reseller-Kontos, und jedes angelegte Konto zählt gegen Ihr Kontingent.
+> 💡 **Für DomainNameAPI-Reseller-Hosting gebaut.** Das Modul ist für die cPanel/WHM- und
+> Plesk-Reseller-Konten gemacht, die DomainNameAPI bereitstellt. Root- oder Admin-Zugang ist nicht
+> nötig; es arbeitet mit den Rechten Ihres DomainNameAPI-Reseller-Kontos, und jedes angelegte Konto
+> zählt gegen Ihr Kontingent. Noch kein Reseller-Hosting-Konto? Sie erhalten eines unter
+> [dm.domainnameapi.com/hosting](https://dm.domainnameapi.com/hosting).
 
 ---
 
@@ -65,7 +68,7 @@ merkt sich, welches Panel geantwortet hat.
 - **WiseCP 5** oder **WiseCP 3**, selbst gehostet, mit Administratorzugang; jede Version hat ihr eigenes Paket
 - **PHP** 8.2 oder neuer unter WiseCP 5, wie von WiseCP 5 verlangt; 7.4 – 8.4 unter WiseCP 3
 - PHP-Erweiterungen: die, die WiseCP 5 ohnehin verlangt, plus `simplexml` (in Standard-PHP-Builds aktiviert)
-- Ein **cPanel/WHM-Reseller-Konto** (WHM-API-Token) &nbsp;oder&nbsp; ein **Plesk-Reseller-Konto**
+- Ein **DomainNameAPI-Reseller-Hosting-Konto**: cPanel/WHM (WHM API token) &nbsp;oder&nbsp; Plesk
   (Secret Key oder das Panel-Passwort)
 - Ausgehender Zugriff vom WiseCP-Server auf den Panel-Server über den API-Port des Panels
 

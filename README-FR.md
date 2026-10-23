@@ -16,7 +16,7 @@
 
 # DNA Reseller Hosting
 
-**Gérez les comptes revendeur cPanel et Plesk depuis un seul module serveur WiseCP.**
+**Gérez les comptes d'hébergement revendeur cPanel et Plesk fournis par DomainNameAPI depuis un seul module serveur WiseCP.**
 
 Un module, deux panneaux. Vous ne choisissez jamais le type de panneau — le module interroge
 lui-même le serveur et retient quel panneau a répondu.
@@ -55,9 +55,11 @@ lui-même le serveur et retient quel panneau a répondu.
 | Consommation d'espace disque et de trafic pour la facturation à l'usage | ✅ | ✅ |
 | Connexion en un clic au panneau de contrôle | ✅ | ✅ |
 
-> 💡 **Conçu pour les revendeurs.** Aucun accès root ou administrateur n'est nécessaire ; le module
-> travaille avec les droits de votre propre compte revendeur, et chaque compte qu'il crée est
-> décompté de votre quota.
+> 💡 **Conçu pour l'hébergement revendeur DomainNameAPI.** Le module est fait pour les comptes
+> revendeur cPanel/WHM et Plesk que fournit DomainNameAPI. Aucun accès root ou administrateur n'est
+> nécessaire ; il travaille avec les droits de votre compte revendeur DomainNameAPI, et chaque compte
+> qu'il crée est décompté de votre quota. Pas encore de compte d'hébergement revendeur ? Obtenez-en un
+> sur [dm.domainnameapi.com/hosting](https://dm.domainnameapi.com/hosting).
 
 ---
 
@@ -66,7 +68,7 @@ lui-même le serveur et retient quel panneau a répondu.
 - **WiseCP 5** ou **WiseCP 3**, auto-hébergé, avec un accès administrateur ; chacun a son propre paquet
 - **PHP** 8.2 ou plus récent sous WiseCP 5, comme l'exige WiseCP 5 ; 7.4 – 8.4 sous WiseCP 3
 - Extensions PHP : celles que WiseCP 5 exige déjà, plus `simplexml` (activée dans les builds PHP standard)
-- Un **compte revendeur cPanel/WHM** (jeton d'API WHM) &nbsp;ou&nbsp; un **compte revendeur Plesk**
+- Un **compte d'hébergement revendeur DomainNameAPI** : cPanel/WHM (WHM API token) &nbsp;ou&nbsp; Plesk
   (clé secrète ou mot de passe du panneau)
 - Un accès sortant du serveur WiseCP vers le serveur du panneau sur le port d'API du panneau
 

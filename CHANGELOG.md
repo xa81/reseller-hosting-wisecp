@@ -1,5 +1,21 @@
 # Değişiklik Günlüğü / Changelog
 
+## WiseCP 5 — 2.0.1 · WiseCP 3 — 1.1.1
+
+**Türkçe**
+
+- Yeni modül logosu: sunucu ikonunun önünde DomainNameAPI işareti
+- Modül açıklaması ve dokümantasyon, modülün DomainNameAPI'nin sağladığı bayi hosting hesapları için olduğunu açıkça belirtiyor
+- WiseCP 5 paketi pazar yeri manifest'ini (ürün 204) taşıyor; elle kurulan kopyalar da güncelleme alıyor
+- Dokümantasyona yeni, hassas bilgi içermeyen ekran görüntüleri eklendi
+
+**English**
+
+- New module logo: the DomainNameAPI mark in front of the server icon
+- The module description and documentation state that the module is for the reseller hosting accounts provided by DomainNameAPI
+- The WiseCP 5 package carries the marketplace manifest (product 204), so manually installed copies receive updates too
+- New screenshots without any sensitive data in the documentation
+
 ## WiseCP 3 — 1.1.0
 
 **Türkçe**

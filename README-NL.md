@@ -16,7 +16,7 @@
 
 # DNA Reseller Hosting
 
-**Beheer cPanel- en Plesk-reselleraccounts vanuit één WiseCP-servermodule.**
+**Beheer de cPanel- en Plesk-resellerhostingaccounts die DomainNameAPI levert vanuit één WiseCP-servermodule.**
 
 Eén module, twee panels. U kiest het paneltype nooit — de module vraagt het de server zelf en
 onthoudt welk panel antwoordde.
@@ -55,8 +55,11 @@ onthoudt welk panel antwoordde.
 | Schijf- en dataverbruik voor verbruiksafhankelijke facturering | ✅ | ✅ |
 | Met één klik inloggen op het controlepaneel | ✅ | ✅ |
 
-> 💡 **Gebouwd voor resellers.** Root- of adminrechten zijn niet nodig; de module werkt met de
-> rechten van uw eigen reselleraccount, en elk account dat zij aanmaakt telt mee voor uw quotum.
+> 💡 **Gebouwd voor DomainNameAPI-resellerhosting.** De module is gemaakt voor de cPanel/WHM- en
+> Plesk-reselleraccounts die DomainNameAPI levert. Root- of adminrechten zijn niet nodig; zij werkt
+> met de rechten van uw DomainNameAPI-reselleraccount, en elk account dat zij aanmaakt telt mee voor
+> uw quotum. Nog geen resellerhostingaccount? Vraag er een aan via
+> [dm.domainnameapi.com/hosting](https://dm.domainnameapi.com/hosting).
 
 ---
 
@@ -65,7 +68,7 @@ onthoudt welk panel antwoordde.
 - **WiseCP 5** of **WiseCP 3**, zelf gehost, met beheerderstoegang; elk heeft een eigen pakket
 - **PHP** 8.2 of nieuwer op WiseCP 5, zoals WiseCP 5 vereist; 7.4 – 8.4 op WiseCP 3
 - PHP-extensies: de extensies die WiseCP 5 al vereist, plus `simplexml` (ingeschakeld in standaard PHP-builds)
-- Een **cPanel/WHM-reselleraccount** (WHM API-token) &nbsp;of&nbsp; een **Plesk-reselleraccount**
+- Een **DomainNameAPI-resellerhostingaccount**: cPanel/WHM (WHM API token) &nbsp;of&nbsp; Plesk
   (secret key of het panelwachtwoord)
 - Uitgaande toegang van de WiseCP-server naar de panelserver op de API-poort van het panel
 

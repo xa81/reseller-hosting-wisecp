@@ -16,7 +16,7 @@
 
 # DNA Reseller Hosting
 
-**Gestisca gli account reseller cPanel e Plesk da un unico modulo server per WiseCP.**
+**Gestisca gli account di hosting reseller cPanel e Plesk forniti da DomainNameAPI da un unico modulo server per WiseCP.**
 
 Un modulo, due pannelli. Il tipo di pannello non lo sceglie lei — il modulo interroga direttamente
 il server e ricorda quale pannello ha risposto.
@@ -55,8 +55,11 @@ il server e ricorda quale pannello ha risposto.
 | Utilizzo di spazio disco e traffico per la fatturazione a consumo | ✅ | ✅ |
 | Accesso al pannello di controllo con un clic | ✅ | ✅ |
 
-> 💡 **Pensato per i reseller.** Non serve accesso root o amministrativo; il modulo lavora con i
-> permessi del suo account reseller, e ogni account creato viene scalato dalla sua quota.
+> 💡 **Pensato per l'hosting reseller di DomainNameAPI.** Il modulo è fatto per gli account reseller
+> cPanel/WHM e Plesk che DomainNameAPI fornisce. Non serve accesso root o amministrativo; lavora con i
+> permessi del suo account reseller DomainNameAPI, e ogni account creato viene scalato dalla sua
+> quota. Non ha ancora un account di hosting reseller? Ne ottenga uno su
+> [dm.domainnameapi.com/hosting](https://dm.domainnameapi.com/hosting).
 
 ---
 
@@ -65,7 +68,7 @@ il server e ricorda quale pannello ha risposto.
 - **WiseCP 5** o **WiseCP 3** installato su un suo server, con accesso amministrativo; ciascuno ha il proprio pacchetto
 - **PHP** 8.2 o superiore su WiseCP 5, come richiesto da WiseCP 5; 7.4 – 8.4 su WiseCP 3
 - Estensioni PHP: quelle già richieste da WiseCP 5, più `simplexml` (attiva nelle build PHP standard)
-- Un **account reseller cPanel/WHM** (token API WHM) &nbsp;oppure&nbsp; un **account reseller Plesk**
+- Un **account di hosting reseller DomainNameAPI**: cPanel/WHM (WHM API token) &nbsp;oppure&nbsp; Plesk
   (chiave segreta o password del pannello)
 - Accesso in uscita dal server WiseCP verso il server del pannello, sulla porta API del pannello
 

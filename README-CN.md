@@ -16,7 +16,7 @@
 
 # DNA Reseller Hosting
 
-**用一个 WiseCP 服务器模块管理 cPanel 与 Plesk 经销商账户。**
+**用一个 WiseCP 服务器模块管理 DomainNameAPI 提供的 cPanel 与 Plesk 经销商主机账户。**
 
 一个模块，两种面板。面板类型无需你选择 —— 模块会亲自询问服务器，并记住是哪种面板作出了响应。
 
@@ -54,8 +54,9 @@
 | 用于计量计费的磁盘与流量用量 | ✅ | ✅ |
 | 一键登录控制面板 | ✅ | ✅ |
 
-> 💡 **为经销商而设计。** 无需 root 或管理员权限；模块以你自己的经销商账户权限运行，它创建的每个账户都会
-> 占用你的配额。
+> 💡 **为 DomainNameAPI 经销商主机而设计。** 本模块专为 DomainNameAPI 提供的 cPanel/WHM 与 Plesk 经销商
+> 账户打造。无需 root 或管理员权限；它以你的 DomainNameAPI 经销商账户权限运行，它创建的每个账户都会占用
+> 你的配额。还没有经销商主机账户？可在 [dm.domainnameapi.com/hosting](https://dm.domainnameapi.com/hosting) 获取。
 
 ---
 
@@ -64,7 +65,7 @@
 - 自建的 **WiseCP 5** 或 **WiseCP 3**，并且你拥有管理员权限；两者各有自己的安装包
 - **PHP**：WiseCP 5 上为 8.2 或更高版本，这是 WiseCP 5 的要求；WiseCP 3 上为 7.4 – 8.4
 - PHP 扩展：WiseCP 5 本身已要求的扩展，外加 `simplexml`（标准 PHP 构建中默认启用）
-- 一个 **cPanel/WHM 经销商账户**（WHM API 令牌）&nbsp;或&nbsp;一个 **Plesk 经销商账户**
+- 一个 **DomainNameAPI 经销商主机账户**：cPanel/WHM（WHM API token）&nbsp;或&nbsp;Plesk
   （secret key 或面板密码）
 - 从 WiseCP 服务器到面板服务器、面板 API 端口的出站访问
 

@@ -16,7 +16,7 @@
 
 # DNA Reseller Hosting
 
-**cPanel və Plesk diler hesablarını tək bir WiseCP server modulundan idarə edin.**
+**DomainNameAPI-nin təqdim etdiyi cPanel və Plesk diler hostinq hesablarını tək bir WiseCP server modulundan idarə edin.**
 
 Bir modul, iki panel. Panel tipini siz seçmirsiniz — modul serverdən özü soruşur və hansı panelin
 cavab verdiyini yadda saxlayır.
@@ -55,8 +55,10 @@ cavab verdiyini yadda saxlayır.
 | İstifadəyə görə hesablaşma üçün disk və trafik istifadəsi | ✅ | ✅ |
 | İdarəetmə panelinə bir kliklə giriş | ✅ | ✅ |
 
-> 💡 **Dilerlər üçün hazırlanıb.** Root və ya admin girişi tələb etmir; modul öz diler hesabınızın
-> səlahiyyətləri ilə işləyir və yaratdığı hər hesab sizin kvotanızdan sayılır.
+> 💡 **DomainNameAPI diler hostinqi üçün hazırlanıb.** Modul DomainNameAPI-nin təqdim etdiyi cPanel/WHM
+> və Plesk diler hesabları üçün nəzərdə tutulub. Root və ya admin girişi tələb etmir; DomainNameAPI
+> diler hesabınızın səlahiyyətləri ilə işləyir və yaratdığı hər hesab sizin kvotanızdan sayılır. Hələ
+> diler hostinq hesabınız yoxdur? [dm.domainnameapi.com/hosting](https://dm.domainnameapi.com/hosting) ünvanından əldə edin.
 
 ---
 
@@ -65,7 +67,7 @@ cavab verdiyini yadda saxlayır.
 - **WiseCP 5** və ya **WiseCP 3**, öz serverinizdə quraşdırılmış, administrator girişi ilə; hər birinin öz paketi var
 - **PHP** WiseCP 5-də 8.2 və ya daha yeni, WiseCP 5-in tələb etdiyi kimi; WiseCP 3-də 7.4 – 8.4
 - PHP genişləndirmələri: WiseCP 5-in onsuz da tələb etdikləri, üstəlik `simplexml` (standart PHP quruluşlarında aktivdir)
-- **cPanel/WHM diler hesabı** (WHM API tokeni) &nbsp;və ya&nbsp; **Plesk diler hesabı**
+- **DomainNameAPI diler hostinq hesabı**: cPanel/WHM (WHM API token) &nbsp;və ya&nbsp; Plesk
   (gizli açar və ya panel şifrəsi)
 - WiseCP serverindən panel serverinə panelin API portu üzərindən çıxış imkanı
 

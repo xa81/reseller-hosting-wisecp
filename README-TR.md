@@ -16,7 +16,7 @@
 
 # DNA Reseller Hosting
 
-**cPanel ve Plesk bayi hesaplarını tek bir WiseCP sunucu modülünden yönetin.**
+**DomainNameAPI'nin sağladığı cPanel ve Plesk bayi hosting hesaplarını tek bir WiseCP sunucu modülünden yönetin.**
 
 Bir modül, iki panel. Panel tipini siz seçmezsiniz — modül sunucuya kendisi sorar ve hangi panelin
 yanıt verdiğini hatırlar.
@@ -55,8 +55,11 @@ yanıt verdiğini hatırlar.
 | Ölçümlü faturalama için disk ve trafik kullanımı | ✅ | ✅ |
 | Kontrol paneline tek tıkla giriş | ✅ | ✅ |
 
-> 💡 **Bayiler için yapıldı.** Root ya da yönetici erişimi gerekmez; modül kendi bayi hesabınızın
-> yetkileriyle çalışır ve açtığı her hesap sizin kotanızdan düşer.
+> 💡 **DomainNameAPI bayi hosting için yapıldı.** Modül, DomainNameAPI'nin sağladığı cPanel/WHM ve
+> Plesk bayi hesapları için hazırlanmıştır. Root ya da yönetici erişimi gerekmez; DomainNameAPI bayi
+> hesabınızın yetkileriyle çalışır ve açtığı her hesap sizin kotanızdan düşer. Henüz bayi hosting
+> hesabınız yok mu? [dm.domainnameapi.com/hosting](https://dm.domainnameapi.com/hosting) adresinden
+> edinebilirsiniz.
 
 ---
 
@@ -65,7 +68,7 @@ yanıt verdiğini hatırlar.
 - **WiseCP 5** ya da **WiseCP 3**, kendi sunucunuzda, yönetici erişimiyle; her birinin kendi paketi var
 - **PHP**: WiseCP 5'te, WiseCP 5'in istediği gibi 8.2 ya da üstü; WiseCP 3'te 7.4 – 8.4
 - PHP eklentileri: WiseCP 5'in zaten istedikleri, artı `simplexml` (standart PHP derlemelerinde açık gelir)
-- Bir **cPanel/WHM bayi hesabı** (WHM API token) &nbsp;ya da&nbsp; bir **Plesk bayi hesabı**
+- Bir **DomainNameAPI bayi hosting hesabı**: cPanel/WHM (WHM API token) &nbsp;ya da&nbsp; Plesk
   (gizli anahtar ya da panel şifresi)
 - WiseCP sunucusundan panel sunucusunun API portuna giden erişim
 

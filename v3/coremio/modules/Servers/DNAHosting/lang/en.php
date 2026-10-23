@@ -1,7 +1,7 @@
 <?php
     return [
         'name'        => "DNA Reseller Hosting",
-        'description' => "Sell shared hosting from a cPanel/WHM or Plesk reseller account. The panel type is detected automatically.",
+        'description' => "Sell hosting from the cPanel/WHM or Plesk reseller account provided by DomainNameAPI. The panel type is detected automatically; no root access is needed.",
         'select-plan'      => "Package / Plan",
         'no-plans'         => "No packages found on this server.",
         'panel-cpanel'     => "cPanel / WHM",

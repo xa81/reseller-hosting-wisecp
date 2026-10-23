@@ -1,7 +1,7 @@
 <?php
     return [
         'name'        => "DNA Bayi Hosting",
-        'description' => "cPanel/WHM veya Plesk bayi hesabı üzerinden paylaşımlı hosting satın. Panel tipi otomatik tespit edilir.",
+        'description' => "DomainNameAPI'nin sağladığı cPanel/WHM ya da Plesk bayi hesabınızdan hosting satın. Panel tipi kendiliğinden tespit edilir; root erişimi gerekmez.",
         'select-plan'      => "Paket / Plan",
         'no-plans'         => "Bu sunucuda hiç paket bulunamadı.",
         'panel-cpanel'     => "cPanel / WHM",
