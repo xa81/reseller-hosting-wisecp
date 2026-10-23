@@ -32,6 +32,10 @@ class DNAHosting_Module extends ServerModule
     {
         $this->_name = __CLASS__;
         parent::__construct($server, $options);
+        if (!class_exists('DNAHosting_Http')) {
+            include __DIR__ . DS . 'init.php';
+        }
+        DNAHosting_Support::$lang = is_array($this->lang) ? $this->lang : array();
     }
 
     protected function define_server_info($server = array())
@@ -41,19 +45,15 @@ class DNAHosting_Module extends ServerModule
         }
     }
 
-    /** Testler icin: gercek cURL yerine sahte tasiyici enjekte eder. */
-    public function useTransport(callable $transport)
-    {
-        $this->transport = $transport;
-        $this->panel     = null;
-        $this->drivers   = array();
-        return $this;
-    }
-
     private function http()
     {
         $scheme = $this->server['secure'] ? 'https' : 'http';
-        $http   = new DNAHosting_Http($scheme . '://' . $this->server['ip'] . ':' . $this->server['port']);
+        // The panel's host name when the server record has one, so the certificate can
+        // be verified; the IP otherwise (WiseCP 3 has no certificate switch for it).
+        $http   = new DNAHosting_Http(
+            $scheme . '://' . DNAHosting_Support::host($this->server) . ':' . $this->server['port'],
+            $this->server['secure'] && DNAHosting_Support::verifiesTls($this->server)
+        );
 
         if ($this->transport) {
             $http->setTransport($this->transport);
@@ -338,18 +338,14 @@ class DNAHosting_Module extends ServerModule
         $domain   = DNAHosting_Support::domainKey($this->orderDomain());
         $webspace = $driver->findWebspace($domain);
         if (!$webspace) {
-            throw new DNAHosting_Exception(
-                '"' . $domain . '" alan adina ait abonelik panelde bulunamadi.'
-            );
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-subscription-missing', $domain));
         }
 
         $expected = $this->externalId();
         $actual   = $driver->customerExternalId($webspace['owner_id']);
         if ($actual !== (string) $expected) {
             throw new DNAHosting_Exception(
-                'Guvenlik nedeniyle islem reddedildi: "' . $domain . '" alan adina ait abonelik'
-                . ' bu modul tarafindan olusturulmamis. Paneldeki musterinin external-id degeri "'
-                . ($actual !== '' ? $actual : '(bos)') . '", beklenen "' . $expected . '".'
+                DNAHosting_Support::t('error-not-ours', $domain, $actual !== '' ? $actual : '-', (string) $expected)
             );
         }
 
@@ -377,6 +373,23 @@ class DNAHosting_Module extends ServerModule
         return $this->config['user'];
     }
 
+    /**
+     * The cPanel account of this service, ownership verified: it must exist and serve
+     * this service's domain. A username edited by hand on the order can then never
+     * point a password change or suspension at somebody else's account.
+     */
+    private function ownedUser()
+    {
+        $user   = $this->panelUser();
+        $domain = DNAHosting_Support::domainKey($this->orderDomain());
+        $key    = 'cpanel_owner|' . $user . '|' . $domain;
+        if (!isset($this->storage[$key])) {
+            $this->driver()->assertServes($user, $domain);
+            $this->storage[$key] = true;
+        }
+        return $user;
+    }
+
     public function suspend()
     {
         try {
@@ -384,7 +397,7 @@ class DNAHosting_Module extends ServerModule
                 $t = $this->pleskTargets();
                 return $this->driver()->suspend($t['webspace_id']);
             }
-            return $this->driver()->suspendAccount($this->panelUser(), 'WiseCP');
+            return $this->driver()->suspendAccount($this->ownedUser(), 'WiseCP');
         } catch (Throwable $e) {
             return $this->failed($e);
         }
@@ -397,7 +410,7 @@ class DNAHosting_Module extends ServerModule
                 $t = $this->pleskTargets();
                 return $this->driver()->unsuspend($t['webspace_id']);
             }
-            return $this->driver()->unsuspendAccount($this->panelUser());
+            return $this->driver()->unsuspendAccount($this->ownedUser());
         } catch (Throwable $e) {
             return $this->failed($e);
         }
@@ -417,10 +430,7 @@ class DNAHosting_Module extends ServerModule
             $domainKey = DNAHosting_Support::domainKey($this->orderDomain());
             $shared    = $this->otherActiveServices($domainKey);
             if ($shared) {
-                throw new DNAHosting_Exception(
-                    $this->lang['error-shared-domain']
-                    . ' Ayni alan adini kullanan diger hizmet numaralari: ' . implode(', ', $shared)
-                );
+                throw new DNAHosting_Exception(DNAHosting_Support::t('error-shared-domain', implode(', ', $shared)));
             }
 
             if ($this->panel() === 'plesk') {
@@ -429,7 +439,7 @@ class DNAHosting_Module extends ServerModule
                 $t = $this->pleskTargets();
                 return $this->driver()->terminate($t['webspace_id'], $t['customer_id'], $this->externalId());
             }
-            return $this->driver()->terminateAccount($user ? $user : $this->panelUser());
+            return $this->driver()->terminateAccount($user ? $user : $this->panelUser(), $domainKey);
         } catch (Throwable $e) {
             return $this->failed($e);
         }
@@ -489,7 +499,7 @@ class DNAHosting_Module extends ServerModule
                 $t = $this->pleskTargets();
                 return $this->driver()->changePassword($t['customer_id'], $t['webspace_id'], $newpw);
             }
-            return $this->driver()->changePassword($this->panelUser(), $newpw);
+            return $this->driver()->changePassword($this->ownedUser(), $newpw);
         } catch (Throwable $e) {
             return $this->failed($e);
         }
@@ -505,7 +515,7 @@ class DNAHosting_Module extends ServerModule
                 $t = $this->pleskTargets();
                 return $this->driver()->changePlan($t['webspace_id'], $this->driver()->resolvePlan($plan));
             }
-            return $this->driver()->changePackage($this->panelUser(), $plan);
+            return $this->driver()->changePackage($this->ownedUser(), $plan);
         } catch (Throwable $e) {
             return $this->failed($e);
         }
@@ -686,7 +696,7 @@ class DNAHosting_Module extends ServerModule
             $t     = $this->pleskTargets();
             $usage = $this->driver()->usage($t['webspace_id']);
         } else {
-            $usage = $this->driver()->usage($this->panelUser());
+            $usage = $this->driver()->usage($this->ownedUser());
         }
 
         $this->storage['usage'] = $usage;
@@ -755,9 +765,11 @@ class DNAHosting_Module extends ServerModule
     {
         try {
             if ($this->panel() === 'plesk') {
+                // Ownership first: the login name alone could belong to anyone.
+                $this->pleskTargets();
                 $url = $this->driver()->createSession($this->panelUser(), self::clientIp());
             } else {
-                $url = $this->driver()->createSession($this->panelUser(), $service, self::clientIp());
+                $url = $this->driver()->createSession($this->ownedUser(), $service, self::clientIp());
             }
         } catch (Throwable $e) {
             $this->failed($e);

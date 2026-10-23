@@ -3,6 +3,50 @@ defined("CORE_FOLDER") or exit("You can not get in here!");
 
 class DNAHosting_Support
 {
+    /** Module texts, set by the module from its own language file. */
+    public static $lang = array();
+
+    /**
+     * Module text with positional placeholders. A missing key falls back to the key
+     * itself, so a message is never empty; a translation with the wrong number of
+     * placeholders still says something.
+     */
+    public static function t($key)
+    {
+        $args = array_slice(func_get_args(), 1);
+        $text = isset(self::$lang[$key]) ? (string) self::$lang[$key] : (string) $key;
+        if (!$args) {
+            return $text;
+        }
+        try {
+            $out = @vsprintf($text, $args);
+        } catch (Throwable $e) {
+            $out = false;
+        }
+        return is_string($out) ? $out : $text . ' ' . implode(' ', $args);
+    }
+
+    /**
+     * The host to connect to: the server's host name when it is a real one, the IP
+     * otherwise - the same rule WiseCP's own cPanel module follows. A certificate is
+     * issued for a name, so only a host name connection can be verified.
+     */
+    public static function host(array $server)
+    {
+        $name = isset($server['name']) ? trim((string) $server['name']) : '';
+        $ip   = isset($server['ip']) ? trim((string) $server['ip']) : '';
+        if ($name !== '' && strpos($name, '.') !== false
+            && preg_match('/^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i', $name)) {
+            return $name;
+        }
+        return $ip;
+    }
+
+    /** True when the connection goes to a host name, so its certificate can be verified. */
+    public static function verifiesTls(array $server)
+    {
+        return self::host($server) !== (isset($server['ip']) ? trim((string) $server['ip']) : '');
+    }
     public static function usernameFor($domain, $panel)
     {
         $label = strtolower((string) $domain);

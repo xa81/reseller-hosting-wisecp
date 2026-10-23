@@ -21,8 +21,8 @@
 Un módulo, dos paneles. Usted nunca elige el tipo de panel: el módulo se lo pregunta al servidor y
 recuerda qué panel respondió.
 
-![WiseCP](https://img.shields.io/badge/WiseCP-self--hosted-4A90D9?style=flat-square)
-![PHP](https://img.shields.io/badge/PHP-7.4%20%E2%80%93%208.4-777BB4?style=flat-square&logo=php&logoColor=white)
+![WiseCP](https://img.shields.io/badge/WiseCP-5.x%20%7C%203.x-4A90D9?style=flat-square)
+![PHP](https://img.shields.io/badge/PHP-7.4%2B-777BB4?style=flat-square&logo=php&logoColor=white)
 ![cPanel](https://img.shields.io/badge/cPanel%2FWHM-compatible-FF6C2C?style=flat-square)
 ![Plesk](https://img.shields.io/badge/Plesk-compatible-53BCE6?style=flat-square)
 
@@ -46,14 +46,14 @@ recuerda qué panel respondió.
 | Función | cPanel/WHM | Plesk |
 |---|:---:|:---:|
 | Prueba de conexión y detección automática del panel | ✅ | ✅ |
-| Creación de cuenta | ✅ | ✅ |
+| Creación de cuenta (se puede reintentar con seguridad) | ✅ | ✅ |
 | Suspender / reactivar | ✅ | ✅ |
 | Cancelación | ✅ | ✅ *(propiedad verificada)* |
 | Cambio de contraseña | ✅ | ✅ |
-| Cambio de paquete / plan | ✅ | ✅ |
-| Sincronización de disco y tráfico | ✅ | ✅ |
-| Acceso al panel del cliente con un clic | ✅ | ✅ |
-| Acceso con un clic desde el área de administración | ✅ | ✅ |
+| Cambio de paquete / plan (mejora y pantalla del servicio) | ✅ | ✅ |
+| Indicadores de disco y tráfico en el resumen del servicio | ✅ | ✅ |
+| Uso de disco y tráfico para facturación por consumo | ✅ | ✅ |
+| Acceso al panel de control con un clic | ✅ | ✅ |
 
 > 💡 **Pensado para revendedores.** No necesita acceso root ni de administrador; el módulo trabaja
 > con los permisos de su propia cuenta de revendedor, y cada cuenta que crea consume su cuota.
@@ -62,15 +62,15 @@ recuerda qué panel respondió.
 
 ## 📋 Requisitos
 
-- **WiseCP** en su propio servidor, con acceso de administrador
-- **PHP** 7.4 – 8.4
-- Extensiones de PHP: `curl`, `simplexml`
+- **WiseCP 5** o **WiseCP 3** en su propio servidor, con acceso de administrador; cada uno tiene su propio paquete
+- **PHP** 8.2 o superior en WiseCP 5, como exige WiseCP 5; 7.4 – 8.4 en WiseCP 3
+- Extensiones de PHP: las que WiseCP 5 ya exige, más `simplexml` (activada en las compilaciones estándar de PHP)
 - Una **cuenta de revendedor de cPanel/WHM** (token de la API de WHM) &nbsp;o&nbsp; una **cuenta de
-  revendedor de Plesk** (clave de API o la contraseña del panel)
+  revendedor de Plesk** (clave secreta o la contraseña del panel)
 - Acceso saliente desde el servidor de WiseCP al servidor del panel, en el puerto de la API del panel
 
 > ✅ No se crea ninguna tabla en la base de datos, no hace falta cron y no hay dependencias de
-> composer. La instalación consiste en copiar una carpeta.
+> composer. No se envía nada a ningún sitio salvo al servidor del panel que usted configure.
 
 ---
 
@@ -78,8 +78,18 @@ recuerda qué panel respondió.
 
 ### 1️⃣ Instale el módulo
 
-Copie la carpeta `DNAHosting` en el directorio `coremio/modules/Servers/` de su instalación de
-WiseCP.
+Cada versión incluye dos paquetes. Elija el de su versión de WiseCP:
+
+| WiseCP | Paquete | Código fuente en este repositorio |
+|---|---|---|
+| **5.x** | `DNAHosting-WiseCP5-v2.x.x.zip` | `v5/coremio/` |
+| **3.x** | `DNAHosting-WiseCP3-v1.x.x.zip` | `v3/coremio/` |
+
+> ⚠️ **Los paquetes no son intercambiables.** WiseCP 5 cambió el contrato de los módulos de servidor,
+> así que el módulo de WiseCP 3 no se carga en WiseCP 5 y viceversa.
+
+Suba el paquete desde el gestor de módulos, o extráigalo en la raíz de su instalación
+de WiseCP. El archivo incluye la ruta completa, así que el módulo queda en:
 
 ```
 wisecp/
@@ -89,111 +99,110 @@ wisecp/
             └── DNAHosting/     ← aquí
 ```
 
+Los pasos siguientes son para **WiseCP 5**. En WiseCP 3 las pantallas tienen otros nombres; consulte
+[WiseCP 3](#-cosas-que-conviene-saber) en *Cosas que conviene saber*.
+
 ### 2️⃣ Añada el servidor
 
-**Products / Services → Hosting/Server → Shared Server Settings → Add New Shared Server**
+**Products → Hosting/Server → Server Settings → Add New Server.** En **Server Automation Module**,
+en la pestaña **Web Hosting**, elija **DNA Reseller Hosting** (aparece bajo *Other*).
 
 | Campo | Qué introducir |
 |---|---|
-| **Server Automation Type** | `DNAHosting`: es el nombre de la carpeta y aparece tal cual en la lista |
-| **IP Address** | La dirección real del servidor del panel; ahí se conecta el módulo |
+| **Address** | El servidor del panel. Mantenga activado el interruptor **https://**. Prefiera un nombre de host que el certificado del panel cubra; una dirección IP solo supera la verificación del certificado si el certificado cubre esa IP |
+| **Port** | Para cPanel viene rellenado `2087`. Para Plesk, pulse **Use Custom Port** e introduzca `8443` |
+| **Verify SSL Certificate** | Manténgalo activado. Desactívelo solo para un panel que use un certificado autofirmado |
 | **Username** | Su usuario de revendedor en ese panel |
-| **Password** | Un token de la API de WHM en cPanel; una clave de API o la contraseña del panel en Plesk |
-| **Connect with SSL** | Márquelo |
-| **Port** | `2087` para cPanel, `8443` para Plesk |
+| **Password** | **cPanel:** un token de la API de WHM creado como ese revendedor. **Plesk:** una clave secreta, o la contraseña del panel |
+| **Hostname** | El nombre de host del servidor del panel; WiseCP también lo muestra en los registros de servidores y servicios. Cuando es un nombre de host completo como `server.example.com`, el módulo se conecta a él en lugar de a **Address**, de modo que la verificación del certificado funciona aunque **Address** contenga una IP |
 
-> ⚠️ **El campo Hostname de la parte superior del formulario es solo una etiqueta.** El módulo se
-> conecta mediante **IP Address**, no mediante ese campo. En el listado sus servidores aparecen con
-> esa etiqueta.
+![Ajustes del servidor en WiseCP 5](https://raw.githubusercontent.com/domainreseller/reseller-hosting-wisecp/main/docs/images/v5-server-settings.png)
 
 ### 3️⃣ Pruebe la conexión
 
-Pulse **Test Connection** antes de guardar, o guarde directamente: WiseCP ejecuta la prueba por su
-cuenta.
+Pulse **Test Connection**. Un resultado verde confirma las credenciales y el panel detectado; si
+falla, se muestra el código HTTP o el propio error del panel. Vea
+[Registros y diagnóstico](#-registros-y-diagnóstico).
 
-Un resultado verde confirma tanto las credenciales como el panel detectado. Si falla, se muestra el
-código HTTP concreto o el error del panel; vea [Registros y diagnóstico](#-registros-y-diagnóstico).
+### 4️⃣ Cree un grupo de servidores *(opcional)*
 
-### 4️⃣ Cree un grupo de servidores
-
-Si tiene más de un servidor, cree un grupo en **Shared Server Settings → Server Groups** y vincule
-el producto al grupo en lugar de a un único servidor. Se ofrecen dos tipos de distribución:
-
-- **Añadir siempre al servidor menos ocupado.**
-- **Llenar un servidor por completo y luego pasar al menos ocupado.**
-
-Los servidores se mueven entre las listas **Unassigned → Assigned** con `Add` / `Remove`.
+Si tiene más de un servidor, cree un grupo en **Server Groups** y vincule el producto al grupo en
+lugar de a un único servidor.
 
 > ⚠️ **Mantenga cada grupo homogéneo por panel.** La lista de paquetes del formulario del producto
-> se obtiene del **único** servidor seleccionado en ese momento. Si un grupo contiene un servidor
-> cPanel y otro Plesk, el nombre de paquete elegido puede no tener equivalente en el otro panel, y
-> el pedido que caiga allí fallará con *paquete no encontrado*.
+> procede de un solo servidor. Si un grupo mezcla cPanel y Plesk, el nombre elegido puede no existir
+> en el otro panel y el pedido que caiga allí fallará con *paquete no encontrado*. El módulo guarda
+> el **nombre** del paquete, no el id del panel, así que un nombre que exista en todos los
+> servidores del grupo funciona en todos ellos.
 
 ### 5️⃣ Configure el producto
 
-**Products / Services → Hosting/Server → Web Hosting Packages** → abra el paquete → pestaña
-**Module Settings**. En **Server Selection** elija **Single Server** o **Server Group** y marque su
-servidor DNAHosting. Entonces el módulo dibuja sus propios campos:
+Cree el producto de hosting y elija **DNA Reseller Hosting** en **Module Assignment**. En la pestaña
+**Automation** del producto, elija **Single Server** (o un grupo de servidores) y el servidor. El módulo
+dibuja entonces un solo campo:
 
 | Ajuste | Valor |
 |---|---|
-| **Detected panel** | El panel encontrado realmente en ese servidor, por ejemplo `cPanel / WHM`. Un error aquí significa que la detección ha fallado |
-| **Package / Plan** | La lista de paquetes obtenida en vivo de ese servidor |
-| **Automatic Setup** | Activado: el pedido se aprovisiona automáticamente. Desactivado: requiere aprobación del administrador |
+| **Package / Plan** | La lista obtenida en vivo del servidor; el panel detectado aparece en la etiqueta, por ejemplo *Package / Plan (cPanel / WHM)*. Si no se puede contactar con el servidor, el campo se convierte en un cuadro de texto con el motivo debajo |
 
-> 💡 **No se preocupe por el prefijo del paquete en cPanel.** Para un paquete que en el panel
-> aparece como `bakcay328_paket2`, el módulo resuelve por su cuenta el prefijo `usuario_`. En Plesk
-> la lista es cada plan de servicio definido en el servidor.
+> 💡 **No se preocupe por el prefijo del paquete en cPanel.** Un paquete que en el panel aparece como
+> `reseller_basic` puede introducirse como `basic`; el módulo resuelve el prefijo por su cuenta.
+
+> ℹ️ Los **Resource Limits** de la misma pestaña no se envían al panel. El disco, el ancho de banda y
+> los demás límites de la cuenta provienen del paquete o plan que elija; WiseCP también lo indica en la
+> pantalla del servicio.
 
 **Guárdelo: el módulo ya está listo.** 🎉
-
-**‼️A partir de aquí gestiona las cuentas de revendedor de cPanel y Plesk desde el módulo en todos los flujos de WiseCP. La creación, la suspensión y la cancelación quedan enteramente bajo el control de WiseCP.**
 
 ---
 
 ## 🔍 Registros y diagnóstico
 
-**Tools → Logs → Module Logs**
+Cada petición que el módulo envía al panel, y la respuesta que recibe, se escribe en el
+**registro del módulo** mientras el registro de módulos esté activado en WiseCP. Cada entrada se
+etiqueta con la llamada al panel, como `createacct` o `webspace.add`.
 
-| Registro | Cuándo escribe | Qué contiene |
-|---|---|---|
-| **Module Logs**<br>*Tools → Logs → Module Logs* | Solo mientras la función **Module Logs** está activa | Cada petición enviada al panel y la respuesta recibida, etiquetadas con el nombre de la operación, como `createacct` o `webspace.add` |
-
-> 💡 El interruptor está en la parte superior de esa misma página. Actívelo antes de reproducir el
-> problema y desactívelo después.
-
-> 🔐 El token de API o la contraseña del servidor, cualquier contraseña de cuenta que el módulo
-> genere o cambie y los tokens de sesión SSO —tanto en la petición como en la respuesta— se
-> enmascaran con `***` **antes de escribir nada**.
+> 🔐 El token o la contraseña del servidor, cualquier contraseña de cuenta que el módulo genere o
+> cambie y los tokens de sesión de inicio de sesión único se enmascaran con `***` **antes de
+> escribir nada**, tanto en la petición como en la respuesta.
 
 ### Errores frecuentes
 
 | Síntoma | Causa y solución |
 |---|---|
-| `HTTP 403`, o una envoltura `cpanelresult` en el texto del error | El revendedor al que pertenece el token no tiene privilegio de nivel WHM para esa llamada. Conceda en **WHM → Resellers → Edit Reseller's ACL List** los permisos de listado de cuentas, creación, suspensión, cancelación, contraseña, mejora de paquete, listado de paquetes, tráfico y sesión, y regenere después el token **como ese revendedor** en **WHM → Development → Manage API Tokens** |
-| Plesk **11003** | La clave de API se emitió para otra IP: genere una nueva para la dirección desde la que conecta WiseCP, o ponga la contraseña del panel en el campo Password |
-| Plesk **1014** | Plesk rechazó el cuerpo de la petición para la versión de XML-API que habla ese servidor. Compruebe que usa la versión actual del módulo; el log del módulo indica el elemento rechazado |
-| Un texto de error en lugar de la lista de paquetes en el formulario del producto | Falló la detección o la llamada de paquetes; el motivo está escrito en esa misma línea |
-
-> 💡 Cualquier otro error HTTP llega con un resumen en texto plano extraído del cuerpo de respuesta
-> del panel: un código de estado a secas nunca es la historia completa.
+| `HTTP 403`, o *el servidor respondió con la API de usuario de cPanel* | El revendedor al que pertenece el token no tiene privilegio de WHM para esa llamada. Conceda en **WHM → Resellers → Edit Reseller's ACL List** los privilegios de listado de cuentas, creación, suspensión, cancelación, contraseña, cambio de paquete, listado de paquetes, tráfico y sesión, y después cree el token **como ese revendedor** |
+| Un error de certificado | El certificado no cubre la dirección que introdujo. Introduzca el nombre de host que cubre el certificado, o desactive **Verify SSL Certificate** para un panel con certificado autofirmado |
+| Plesk **11003** | La clave secreta se emitió para otra IP. Cree una nueva para la dirección desde la que conecta WiseCP, o use la contraseña del panel |
+| *Rechazado por seguridad: la suscripción … no fue creada por este servicio* | En Plesk el módulo solo actúa sobre clientes que creó para ese servicio. La suscripción se creó a mano o desde otro servicio |
 
 ---
 
 ## 🧩 Cosas que conviene saber
 
 <details>
+<summary><b>Los reintentos son seguros</b></summary>
+
+<br>
+
+La cola de módulos de WiseCP vuelve a ejecutar una creación fallida. El módulo guarda el nombre de
+usuario y la contraseña cifrada antes de llamar al panel, así que un reintento los reutiliza: una
+cuenta que se creó pero cuya respuesta se perdió se adopta en lugar de fallar con *ya existe*. La
+cancelación de una cuenta que ya no existe se da por completada.
+
+</details>
+
+<details>
 <summary><b>Diferencias entre paneles</b></summary>
 
 <br>
 
-- **La cancelación en Plesk verifica la propiedad.** Cada cuenta que abre el módulo se marca con un
-  identificador interno; esa marca se comprueba antes de cualquier operación, de modo que el módulo
-  nunca puede apuntar a una suscripción creada a mano en el panel.
-- **Cambiar el dominio de un servicio en marcha se rechaza en Plesk.** Una suscripción de Plesk se
-  localiza por su dominio, así que modificarlo haría fallar de forma permanente todas las
-  operaciones posteriores. En cPanel el dominio sí puede editarse; la cuenta sigue sirviendo el
-  dominio antiguo hasta que lo cambie en el panel.
+- **Cada operación en Plesk verifica la propiedad.** El cliente que crea el módulo lleva el número
+  de servicio como id externo, y esa marca se comprueba antes de cualquier operación. El módulo
+  nunca puede actuar sobre una suscripción creada a mano.
+- **Cambiar el dominio de un servicio de Plesk en marcha** no se traslada al panel: una suscripción
+  de Plesk se localiza por su dominio, así que las operaciones posteriores indicarán que no existe
+  ninguna suscripción. Cambie también el nombre de la suscripción en Plesk. En cPanel la cuenta sigue
+  sirviendo el dominio antiguo hasta que lo cambie en el panel.
 - **Protección contra dominios duplicados.** La cancelación se rechaza mientras el mismo dominio
   siga vinculado a otro servicio activo o suspendido en el mismo servidor.
 
@@ -204,13 +213,13 @@ servidor DNAHosting. Entonces el módulo dibuja sus propios campos:
 
 <br>
 
-El tipo de panel no se configura en ningún sitio. En la primera llamada el módulo sondea el
-servidor y recuerda qué panel respondió.
+El tipo de panel nunca se configura. En la primera llamada el módulo sondea el servidor y recuerda
+durante una semana qué panel respondió; **Test Connection** siempre vuelve a sondear.
 
 El puerto solo decide qué panel se prueba **primero**: `8443` y `8880` prueban antes Plesk,
-cualquier otro valor prueba antes cPanel. La decisión en sí procede siempre de una llamada real a
-la API, y se prueba el otro panel cuando la primera suposición no responde. Un puerto equivocado
-ralentiza la detección, no la rompe.
+cualquier otro prueba antes cPanel. Una suposición errónea ralentiza la detección, no la rompe.
+Durante la detección, el módulo también envía la credencial configurada al endpoint de API del otro
+panel en el **mismo** servidor; nunca contacta con ningún otro host.
 
 </details>
 
@@ -220,10 +229,39 @@ ralentiza la detección, no la rompe.
 <br>
 
 Ambos paneles reciben su credencial en el campo **Password**, que WiseCP guarda cifrado. El campo
-**Access Hash** no lo usa nunca este módulo y ni siquiera se muestra en los servidores DNAHosting.
+**Access Hash** se guarda como texto plano, por lo que este módulo no lo ofrece y nunca lo lee. En
+Plesk el módulo prueba primero la credencial como clave secreta y recurre por su cuenta al usuario y
+la contraseña.
 
-En Plesk el módulo prueba primero la credencial como clave de API y recurre por su cuenta a la
-autenticación HTTP basic; no hace falta que le diga cuál ha introducido.
+</details>
+
+<details>
+<summary><b>WiseCP 3</b></summary>
+
+<br>
+
+El paquete de WiseCP 3 (`v3/coremio/`) ofrece el mismo aprovisionamiento en las pantallas propias de
+WiseCP 3:
+
+1. **Products / Services → Hosting/Server → Shared Server Settings → Add New Shared Server.** Elija
+   `DNAHosting` como **Server Automation Type** y rellene **IP Address**, **Username**, **Password**
+   (el token de la API de WHM, la clave secreta de Plesk o la contraseña de Plesk), **Connect with
+   SSL** y **Port** (`2087` para cPanel, `8443` para Plesk). El campo **Hostname** de esa pantalla es
+   solo una etiqueta; el módulo se conecta a **IP Address**. Pulse **Test Connection**.
+2. **Products / Services → Hosting/Server → Web Hosting Packages** → abra el paquete → pestaña
+   **Module Settings**. Elija el servidor o el grupo; el módulo muestra el **Detected panel** y la
+   lista **Package / Plan**.
+
+Diferencias con el paquete de WiseCP 5:
+
+- WiseCP 3 no tiene un interruptor de verificación de certificados para los módulos de servidor.
+  Cuando el **Hostname** del servidor es un nombre de host completo que cubre el certificado del
+  panel, el paquete se conecta a él y verifica el certificado; con solo una dirección IP se conecta a
+  la IP sin verificación.
+- El área de cliente muestra el uso de disco y de ancho de banda y un botón para iniciar sesión en el
+  panel; las tarjetas de resumen del servicio de WiseCP 5 no existen en WiseCP 3.
+- En Plesk, cambiar el dominio de un servicio activo se rechaza en lugar de dejarse en manos del
+  operador.
 
 </details>
 
@@ -232,10 +270,11 @@ autenticación HTTP basic; no hace falta que le diga cuál ha introducido.
 
 <br>
 
-La gestión de cuentas de correo y reenvíos, la venta de cuentas de revendedor, la importación de
-cuentas existentes a WiseCP y un botón de *acceso al panel root* en el área de administración. El
-módulo solo guarda una credencial de **revendedor** —nunca root—, así que no hay ningún panel root
-que pueda abrir.
+Herramientas de gestión de correo, bases de datos y archivos, la venta de cuentas de revendedor, la
+importación de cuentas existentes a WiseCP y un botón de *iniciar sesión como administrador del
+servidor*. El módulo solo guarda una credencial de **revendedor**, nunca root. La importación se ha
+dejado fuera a propósito: una suscripción de Plesk importada no llevaría la marca de propiedad de
+este módulo, y toda operación posterior sobre ella se rechazaría.
 
 </details>
 

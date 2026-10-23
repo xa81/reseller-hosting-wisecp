@@ -84,8 +84,7 @@ class DNAHosting_Plesk
 
         if ($packet === false || $packet->getName() !== 'packet') {
             throw new DNAHosting_Exception(
-                $action . ': sunucu gecerli XML dondurmedi. '
-                . $this->http->safeSummary($action, $response['body'])
+                DNAHosting_Support::t('error-bad-xml', $action, $this->http->safeSummary($action, $response['body']))
             );
         }
 
@@ -105,12 +104,12 @@ class DNAHosting_Plesk
         $node = $packet;
         foreach (explode('/', $path) as $step) {
             if (!isset($node->{$step})) {
-                throw new DNAHosting_Exception('Plesk yanitinda <' . $step . '> bulunamadi.');
+                throw new DNAHosting_Exception(DNAHosting_Support::t('error-bad-xml', $path, '<' . $step . '>'));
             }
             $node = $node->{$step};
         }
         if (!isset($node->result)) {
-            throw new DNAHosting_Exception('Plesk yanitinda <result> bulunamadi.');
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-bad-xml', $path, '<result>'));
         }
 
         $result = $node->result;
@@ -123,15 +122,14 @@ class DNAHosting_Plesk
 
     private static function describe($code, $text)
     {
-        $text = trim($text) !== '' ? trim($text) : 'sebep bildirilmedi';
+        $text = trim($text) !== '' ? trim($text) : DNAHosting_Support::t('error-no-reason');
         $hint = '';
         if ($code === '11003') {
-            $hint = ' Bu anahtar baska bir IP adresi icin uretilmis;'
-                . ' Plesk > Tools & Settings > API anahtarlarindan bu sunucunun IP adresi icin yenisini olusturun.';
+            $hint = ' ' . DNAHosting_Support::t('hint-plesk-11003');
         } elseif ($code === '1014') {
-            $hint = ' Istek govdesinde bir eleman Pleskin bekledigi yerde degil.';
+            $hint = ' ' . DNAHosting_Support::t('hint-plesk-1014');
         } elseif ($code === '1013' || $code === '1015') {
-            $hint = ' Aranan nesne panelde bulunamadi.';
+            $hint = ' ' . DNAHosting_Support::t('hint-plesk-not-found');
         }
         return 'Plesk (' . ($code !== '' ? $code : '?') . '): ' . $text . $hint;
     }
@@ -187,7 +185,7 @@ class DNAHosting_Plesk
     {
         $configured = trim((string) $configured);
         if ($configured === '') {
-            throw new DNAHosting_Exception('Urun icin bir plan secilmemis.');
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-no-plan'));
         }
 
         $plans = $this->listPlans();
@@ -200,8 +198,7 @@ class DNAHosting_Plesk
         }
 
         throw new DNAHosting_Exception(
-            '"' . $configured . '" plani sunucuda bulunamadi. Mevcut planlar: '
-            . ($names ? implode(', ', $names) : '(hic plan yok)')
+            DNAHosting_Support::t('error-plan-not-found', $configured, $names ? implode(', ', $names) : '-')
         );
     }
 
@@ -328,8 +325,7 @@ class DNAHosting_Plesk
         $existing = $this->findWebspace($a['domain']);
         if ($existing !== null && $existing['owner_id'] !== $customerId) {
             throw new DNAHosting_Exception(
-                '"' . $a['domain'] . '" icin bu sunucuda zaten bir abonelik var ve baska bir '
-                . 'musteriye ait (owner-id ' . $existing['owner_id'] . '). Devralmayi reddediyoruz.'
+                DNAHosting_Support::t('error-domain-owned', $a['domain'], (string) $existing['owner_id'])
             );
         }
 
@@ -466,10 +462,7 @@ class DNAHosting_Plesk
     {
         $webspaceId = (int) $webspaceId;
         if ($webspaceId <= 0) {
-            throw new DNAHosting_Exception(
-                'Silme reddedildi: bu hizmet icin bir Plesk abonelik kimligi cozulemedi. '
-                . 'Kimliksiz bir filtre sunucudaki her abonelikle eslesir.'
-            );
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-no-webspace-id'));
         }
 
         $packet = $this->request(
@@ -527,9 +520,11 @@ class DNAHosting_Plesk
             return 1;
         }
 
+        // A customer without subscriptions still gets an "ok" result that carries only
+        // the filter id; only results naming a subscription id count.
         $count = 0;
         foreach ($packet->webspace->get->result as $result) {
-            if ((string) $result->status === 'ok') {
+            if ((string) $result->status === 'ok' && trim((string) $result->id) !== '') {
                 $count++;
             }
         }
@@ -576,7 +571,7 @@ class DNAHosting_Plesk
     {
         $packet = $this->request(
             '<webspace><get><filter><id>' . (int) $webspaceId . '</id></filter>'
-            . '<dataset><stat/><limits/></dataset></get></webspace>',
+            . '<dataset><gen_info/><stat/><limits/></dataset></get></webspace>',
             'webspace.get'
         );
         $result = self::resultOf($packet, 'webspace/get');
@@ -589,7 +584,9 @@ class DNAHosting_Plesk
         }
 
         return array(
-            'disk_used'  => isset($result->data->stat->real_size) ? (int) $result->data->stat->real_size : 0,
+            // Plesk reports disk usage in gen_info; older code read stat and saw 0.
+            'disk_used'  => isset($result->data->gen_info->real_size) ? (int) $result->data->gen_info->real_size
+                : (isset($result->data->stat->real_size) ? (int) $result->data->stat->real_size : 0),
             'disk_limit' => self::limitToBytes($limits, 'disk_space'),
             'bw_used'    => isset($result->data->stat->traffic) ? (int) $result->data->stat->traffic : 0,
             'bw_limit'   => self::limitToBytes($limits, 'max_traffic'),
@@ -609,7 +606,8 @@ class DNAHosting_Plesk
         $packet = $this->request(
             '<server><create_session>'
             . '<login>' . self::esc($login) . '</login>'
-            . '<data><user_ip>' . self::esc($clientIp) . '</user_ip><source_server/></data>'
+            // Plesk expects the client address base64-encoded.
+            . '<data><user_ip>' . self::esc(base64_encode((string) $clientIp)) . '</user_ip><source_server/></data>'
             . '</create_session></server>',
             'server.create_session'
         );
@@ -617,7 +615,7 @@ class DNAHosting_Plesk
 
         $sessionId = (string) $result->id;
         if ($sessionId === '') {
-            throw new DNAHosting_Exception('Plesk oturum kimligi dondurmedi.');
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-no-session'));
         }
 
         // PLESKSESSID canli bir kimlik bilgisidir; sir olarak kaydedilirse sonraki her
@@ -625,7 +623,7 @@ class DNAHosting_Plesk
         $this->http->addSecret($sessionId);
 
         return ($this->server['secure'] ? 'https' : 'http') . '://'
-            . $this->server['ip'] . ':' . $this->server['port']
+            . DNAHosting_Support::host($this->server) . ':' . $this->server['port']
             . '/enterprise/rsession_init.php?PLESKSESSID=' . rawurlencode($sessionId);
     }
 }

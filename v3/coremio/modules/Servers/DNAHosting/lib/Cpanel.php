@@ -8,7 +8,7 @@ class DNAHosting_Cpanel
     private $packages = null;
 
     private static $readOnly = array(
-        'listaccts', 'listpkgs', 'accountsummary', 'myprivs', 'showbw', 'version',
+        'listaccts', 'listpkgs', 'accountsummary', 'myprivs', 'showbw', 'version', 'create_user_session',
     );
 
     public function __construct(array $server, DNAHosting_Http $http)
@@ -53,32 +53,44 @@ class DNAHosting_Cpanel
         $decoded = json_decode($body, true);
         if (!is_array($decoded)) {
             throw new DNAHosting_Exception(
-                $function . ': sunucu gecerli JSON dondurmedi. '
-                . $this->http->safeSummary($function, $body)
+                DNAHosting_Support::t('error-bad-json', $function, $this->http->safeSummary($function, $body))
             );
         }
 
         if (isset($decoded['cpanelresult'])) {
             $inner = $decoded['cpanelresult'];
-            $why   = isset($inner['error']) ? $inner['error'] : 'bilinmeyen hata';
-            throw new DNAHosting_Exception(
-                'Sunucu WHM yerine cPanel kullanici APIsi ile yanit verdi — bu kullanicinin WHM erisimi yok. '
-                . 'WHM > Reseller Center uzerinden ACL yetkilerini kontrol edin. Panelin dedigi: ' . $why
-            );
+            $why   = isset($inner['error']) ? $inner['error'] : DNAHosting_Support::t('error-no-reason');
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-no-whm-access', $this->http->mask($why)));
         }
 
-        if (isset($decoded['metadata']['result']) && (int) $decoded['metadata']['result'] !== 1) {
-            $why = isset($decoded['metadata']['reason']) ? $decoded['metadata']['reason'] : 'sebep bildirilmedi';
-            throw new DNAHosting_Exception($why);
+        // WHM API 1 always reports a result; a reply without one is not a success.
+        if (!isset($decoded['metadata']['result']) || (int) $decoded['metadata']['result'] !== 1) {
+            $why = isset($decoded['metadata']['reason']) ? $decoded['metadata']['reason']
+                : (isset($decoded['statusmsg']) ? $decoded['statusmsg'] : DNAHosting_Support::t('error-no-reason'));
+            throw new DNAHosting_Exception($this->http->mask((string) $why));
         }
 
         return isset($decoded['data']) ? $decoded['data'] : $decoded;
     }
 
+    /** Lists nothing on purpose: the search matches no account, the call only proves access. */
     public function testConnection()
     {
-        $this->call('listaccts', array('want' => 'domain'));
+        $this->call('listaccts', array('searchtype' => 'user', 'search' => '^$', 'want' => 'user'));
         return true;
+    }
+
+    /** Refuses to act on an account that does not exist or does not serve $domain. */
+    public function assertServes($username, $domain)
+    {
+        $summary = $this->accountSummary($username);
+        if (!$summary) {
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-account-missing', $username));
+        }
+        $served = isset($summary['domain']) ? (string) $summary['domain'] : '';
+        if ($domain !== '' && strcasecmp($served, $domain) !== 0) {
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-not-ours-cpanel', $username, $served, $domain));
+        }
     }
 
     public function listPackages()
@@ -114,7 +126,7 @@ class DNAHosting_Cpanel
     {
         $configured = trim((string) $configured);
         if ($configured === '') {
-            throw new DNAHosting_Exception('Urun icin bir paket secilmemis.');
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-no-plan'));
         }
 
         $packages = $this->listPackages();
@@ -132,8 +144,7 @@ class DNAHosting_Cpanel
         }
 
         throw new DNAHosting_Exception(
-            '"' . $configured . '" paketi sunucuda bulunamadi. Mevcut paketler: '
-            . ($names ? implode(', ', $names) : '(hic paket yok)')
+            DNAHosting_Support::t('error-plan-not-found', $configured, $names ? implode(', ', $names) : '-')
         );
     }
 
@@ -198,9 +209,22 @@ class DNAHosting_Cpanel
         return true;
     }
 
-    public function terminateAccount($username)
+    /**
+     * Removing an account that is already gone counts as done. An account that serves
+     * another domain is never removed.
+     */
+    public function terminateAccount($username, $domain = '')
     {
-        $this->call('removeacct', array('user' => $username, 'keepdns' => 0));
+        $summary = $this->accountSummary($username);
+        if (!$summary) {
+            return true;
+        }
+        $served = isset($summary['domain']) ? (string) $summary['domain'] : '';
+        if ($domain !== '' && strcasecmp($served, $domain) !== 0) {
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-not-ours-cpanel', $username, $served, $domain));
+        }
+        // WHM API 1 documents "username"; "user" is the older spelling some versions still read.
+        $this->call('removeacct', array('username' => $username, 'user' => $username, 'keepdns' => 0));
         return true;
     }
 
@@ -222,7 +246,7 @@ class DNAHosting_Cpanel
     {
         $summary = $this->accountSummary($username);
         if (!$summary) {
-            throw new DNAHosting_Exception('"' . $username . '" hesabi sunucuda bulunamadi.');
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-account-missing', $username));
         }
 
         $bandwidth = $this->bandwidth($username);
@@ -251,7 +275,12 @@ class DNAHosting_Cpanel
      */
     public function bandwidth($username)
     {
-        $rows = self::bandwidthRows($this->call('showbw'));
+        // Filtered to this account: an unfiltered call returns every account of the
+        // reseller, and that list would end up in this service's log.
+        $rows = self::bandwidthRows($this->call('showbw', array(
+            'searchtype' => 'user',
+            'search'     => '^' . preg_quote((string) $username, '/') . '$',
+        )));
 
         foreach ($rows as $row) {
             if (!isset($row['user']) || strcasecmp((string) $row['user'], (string) $username) !== 0) {
@@ -314,13 +343,13 @@ class DNAHosting_Cpanel
     {
         $data = $this->call('create_user_session', array('user' => $username, 'service' => $service));
         if (empty($data['url'])) {
-            throw new DNAHosting_Exception('Sunucu oturum baglantisi dondurmedi.');
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-no-session'));
         }
 
         $url = (string) $data['url'];
         if (strpos($url, 'http') !== 0) {
             $scheme = $this->server['secure'] ? 'https' : 'http';
-            $url    = $scheme . '://' . $this->server['ip'] . ':2083' . $url;
+            $url    = $scheme . '://' . DNAHosting_Support::host($this->server) . ':2083' . $url;
         }
 
         // WHM her zaman SSL portunda bir https URLsi uretir. secure=0 bir sunucuda sema
@@ -339,7 +368,7 @@ class DNAHosting_Cpanel
         $parts = parse_url($url);
         if (!is_array($parts) || empty($parts['host']) || !isset($parts['scheme'])
             || !in_array(strtolower($parts['scheme']), array('http', 'https'), true)) {
-            throw new DNAHosting_Exception('Sunucu kullanilamaz bir oturum baglantisi dondurdu.');
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-no-session'));
         }
 
         // cpsess... jetonu ayri bir alanda degil, yolun icinde gelir: URLnin kendisi canli

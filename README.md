@@ -21,8 +21,8 @@
 One module, two panels. You never pick the panel type — the module asks the server itself and
 remembers which panel answered.
 
-![WiseCP](https://img.shields.io/badge/WiseCP-self--hosted-4A90D9?style=flat-square)
-![PHP](https://img.shields.io/badge/PHP-7.4%20%E2%80%93%208.4-777BB4?style=flat-square&logo=php&logoColor=white)
+![WiseCP](https://img.shields.io/badge/WiseCP-5.x%20%7C%203.x-4A90D9?style=flat-square)
+![PHP](https://img.shields.io/badge/PHP-7.4%2B-777BB4?style=flat-square&logo=php&logoColor=white)
 ![cPanel](https://img.shields.io/badge/cPanel%2FWHM-supported-FF6C2C?style=flat-square)
 ![Plesk](https://img.shields.io/badge/Plesk-supported-53BCE6?style=flat-square)
 
@@ -46,14 +46,14 @@ remembers which panel answered.
 | Feature | cPanel/WHM | Plesk |
 |---|:---:|:---:|
 | Connection test and automatic panel detection | ✅ | ✅ |
-| Account creation | ✅ | ✅ |
+| Account creation (safe to retry) | ✅ | ✅ |
 | Suspend / unsuspend | ✅ | ✅ |
 | Termination | ✅ | ✅ *(ownership verified)* |
 | Password change | ✅ | ✅ |
-| Package / plan change | ✅ | ✅ |
-| Disk & bandwidth usage sync | ✅ | ✅ |
-| One-click login to the client panel | ✅ | ✅ |
-| One-click login from the admin area | ✅ | ✅ |
+| Package / plan change (upgrade and the service screen) | ✅ | ✅ |
+| Disk and bandwidth gauges on the service overview | ✅ | ✅ |
+| Disk and bandwidth usage for metered billing | ✅ | ✅ |
+| One-click login to the control panel | ✅ | ✅ |
 
 > 💡 **Built for resellers.** It does not need root or admin access; the module works with the
 > permissions of your own reseller account, and every account it creates counts against your quota.
@@ -62,15 +62,15 @@ remembers which panel answered.
 
 ## 📋 Requirements
 
-- **WiseCP**, self-hosted, with administrator access
-- **PHP** 7.4 – 8.4
-- PHP extensions: `curl`, `simplexml`
+- **WiseCP 5** or **WiseCP 3**, self-hosted, with administrator access; each has its own package
+- **PHP** 8.2 or newer on WiseCP 5, as WiseCP 5 requires; 7.4 – 8.4 on WiseCP 3
+- PHP extensions: the ones WiseCP 5 already requires, plus `simplexml` (enabled in standard PHP builds)
 - A **cPanel/WHM reseller account** (WHM API token) &nbsp;or&nbsp; a **Plesk reseller account**
-  (API key or the panel password)
+  (secret key or the panel password)
 - Outbound access from the WiseCP server to the panel server on the panel's API port
 
 > ✅ No database table is created, no cron job is required, and there are no composer dependencies.
-> Installation is nothing more than copying a folder.
+> Nothing is sent anywhere except to the panel server you configure.
 
 ---
 
@@ -78,8 +78,18 @@ remembers which panel answered.
 
 ### 1️⃣ Install the module
 
-Copy the `DNAHosting` folder into the `coremio/modules/Servers/` directory of your WiseCP
-installation.
+Every release carries two packages. Pick the one for your WiseCP version:
+
+| WiseCP | Package | Source in this repository |
+|---|---|---|
+| **5.x** | `DNAHosting-WiseCP5-v2.x.x.zip` | `v5/coremio/` |
+| **3.x** | `DNAHosting-WiseCP3-v1.x.x.zip` | `v3/coremio/` |
+
+> ⚠️ **The packages are not interchangeable.** WiseCP 5 changed the server module contract, so the
+> WiseCP 3 module does not load on WiseCP 5 and the other way round.
+
+Upload the package from the module manager, or extract it into the root of your WiseCP
+installation. The archive carries the full path, so the module lands in:
 
 ```
 wisecp/
@@ -89,108 +99,107 @@ wisecp/
             └── DNAHosting/     ← here
 ```
 
+The steps below are for **WiseCP 5**. On WiseCP 3 the screens are named differently; see
+[WiseCP 3](#-things-worth-knowing) under *Things worth knowing*.
+
 ### 2️⃣ Add the server
 
-**Products / Services → Hosting/Server → Shared Server Settings → Add New Shared Server**
+**Products → Hosting/Server → Server Settings → Add New Server.** Under **Server Automation Module**,
+on the **Web Hosting** tab, pick **DNA Reseller Hosting** (listed under *Other*).
 
 | Field | What to enter |
 |---|---|
-| **Server Automation Type** | `DNAHosting` — the folder name, listed exactly like that |
-| **IP Address** | The real address of the panel server; the module connects here |
+| **Address** | The panel server. Keep the **https://** switch on. Prefer a host name the panel's certificate covers; an IP address only passes certificate verification when the certificate covers that IP |
+| **Port** | `2087` is filled in for cPanel. For Plesk, press **Use Custom Port** and enter `8443` |
+| **Verify SSL Certificate** | Keep it on. Turn it off only for a panel that runs on a self-signed certificate |
 | **Username** | Your reseller username on that panel |
-| **Password** | A WHM API token on cPanel, an API key or the panel password on Plesk |
-| **Connect with SSL** | Tick it |
-| **Port** | `2087` for cPanel, `8443` for Plesk |
+| **Password** | **cPanel:** a WHM API token created as that reseller. **Plesk:** a secret key, or the panel password |
+| **Hostname** | The panel server's host name; WiseCP also shows it on server and service records. When it is a full host name such as `server.example.com`, the module connects to it instead of **Address**, so certificate verification works even when **Address** holds an IP |
 
-> ⚠️ **The Hostname field at the top of the form is only a label.** The module connects to
-> **IP Address**, never to that one. Your servers appear under this label in the server list.
+![Server settings on WiseCP 5](https://raw.githubusercontent.com/domainreseller/reseller-hosting-wisecp/main/docs/images/v5-server-settings.png)
 
 ### 3️⃣ Test the connection
 
-Press **Test Connection** before saving, or simply save — WiseCP runs the test on its own.
+Press **Test Connection**. A green result confirms the credentials and the detected panel; a failure
+shows the HTTP code or the panel's own error. See [Logs and troubleshooting](#-logs-and-troubleshooting).
 
-A green result confirms both the credentials and the detected panel. A failure shows the concrete
-HTTP code or panel error; see [Logs and troubleshooting](#-logs-and-troubleshooting).
+### 4️⃣ Create a server group *(optional)*
 
-### 4️⃣ Create a server group
+If you have more than one server, create a group under **Server Groups** and bind the product to the
+group instead of a single server.
 
-If you have more than one server, use **Shared Server Settings → Server Groups** to create a group
-and bind the product to the group instead of a single server. Two distribution types are offered:
-
-- **Always add to the least full server.**
-- **Fill one server completely, then move on to the least full server.**
-
-Servers are moved between the **Unassigned → Assigned** lists with `Add` / `Remove`.
-
-> ⚠️ **Keep a group homogeneous per panel.** The package list on the product form is pulled from the
-> **single** server selected at that moment. If a group holds both a cPanel and a Plesk server, the
-> package name you picked may have no counterpart on the other panel, and an order landing on that
-> server fails with *package not found*.
+> ⚠️ **Keep a group homogeneous per panel.** The package list on the product form comes from one
+> server. If a group mixes cPanel and Plesk, the name you picked may not exist on the other panel and
+> an order landing there fails with *package not found*. The module stores the package **name**, not
+> the panel's id, so a name that exists on every server of the group works on all of them.
 
 ### 5️⃣ Configure the product
 
-**Products / Services → Hosting/Server → Web Hosting Packages** → open the package → **Module
-Settings** tab. Under **Server Selection**, choose **Single Server** or **Server Group** and pick
-your DNAHosting server. The module then draws its own fields:
+Create the hosting product and choose **DNA Reseller Hosting** under **Module Assignment**. On the
+product's **Automation** tab, pick **Single Server** (or a server group) and the server. The module
+then draws one field:
 
 | Setting | Value |
 |---|---|
-| **Detected panel** | The panel actually found on that server, for example `cPanel / WHM`. An error here means detection failed |
-| **Package / Plan** | The package list pulled live from that server |
-| **Automatic Setup** | On: the order is provisioned automatically. Off: admin approval is required |
+| **Package / Plan** | The list pulled live from the server; the detected panel is shown in the label, for example *Package / Plan (cPanel / WHM)*. If the server cannot be reached the field becomes a text box with the reason under it |
 
-> 💡 **Do not worry about the package prefix on cPanel.** For a package that shows up as
-> `bakcay328_paket2` in the panel, the module resolves the `username_` prefix itself. On Plesk the
-> list is every service plan defined on the server.
+> 💡 **Do not worry about the package prefix on cPanel.** A package listed as `reseller_basic` on the
+> panel can be entered as `basic`; the module resolves the prefix itself.
+
+> ℹ️ **Resource Limits** on the same tab are not sent to the panel. The account's disk, bandwidth and
+> other limits come from the package or plan you pick; WiseCP says so on the service screen as well.
 
 **Save it — the module is ready to use.** 🎉
-
-**‼️From this point on you can manage cPanel and Plesk reseller accounts through the module across every WiseCP workflow. Creation, suspension and termination are entirely under WiseCP's control.**
 
 ---
 
 ## 🔍 Logs and troubleshooting
 
-**Tools → Logs → Module Logs**
+Every request the module sends to the panel, and the response it returned, is written to the
+**module log** while module logging is enabled in WiseCP. Each entry is tagged with the panel call,
+such as `createacct` or `webspace.add`.
 
-| Log | When it writes | What it contains |
-|---|---|---|
-| **Module Logs**<br>*Tools → Logs → Module Logs* | Only while the **Module Logs** feature is on | Every request sent to the panel and the response it returned, tagged with the operation name such as `createacct` or `webspace.add` |
-
-> 💡 The switch that enables logging sits at the top of that same page. Turn it on before
-> reproducing the problem, then turn it back off.
-
-> 🔐 The server's API token or password, any account password the module generates or changes, and
-> SSO session tokens are masked with `***` **before anything is written** — in the request and in
-> the response alike.
+> 🔐 The server's token or password, every account password the module generates or changes, and
+> single sign-on session tokens are masked with `***` **before anything is written**, in the request
+> and in the response alike.
 
 ### Common errors
 
 | Symptom | Cause and fix |
 |---|---|
-| `HTTP 403`, or a `cpanelresult` envelope in the error text | The reseller behind the token has no WHM-level privilege for that call. Grant the account listing, creation, suspension, termination, password, package upgrade, package listing, bandwidth and session privileges in **WHM → Resellers → Edit Reseller's ACL List**, then regenerate the token **as that reseller** in **WHM → Development → Manage API Tokens** |
-| Plesk **11003** | The API key was issued for a different IP — generate a new one for the address WiseCP connects from, or put the panel password in the Password field |
-| Plesk **1014** | Plesk rejected the request body for the XML-API version this server speaks. Check that you run the current module version; the module log names the element it objected to |
-| An error text instead of the package list on the product form | Detection or the package call failed; the reason is written on the same line |
-
-> 💡 Every other HTTP error arrives with a plain-text summary extracted from the panel's response
-> body — a bare status code is never the whole story.
+| `HTTP 403`, or *the server answered with the cPanel user API* | The reseller behind the token has no WHM privilege for that call. Grant account listing, creation, suspension, termination, password, package change, package listing, bandwidth and session privileges in **WHM → Resellers → Edit Reseller's ACL List**, then create the token **as that reseller** |
+| A certificate error | The certificate does not cover the address you entered. Enter the hostname the certificate covers, or turn off **Verify SSL Certificate** for a self-signed panel |
+| Plesk **11003** | The secret key was issued for a different IP. Create a new one for the address WiseCP connects from, or use the panel password |
+| *Refused for safety: the subscription … was not created by this service* | On Plesk the module only acts on customers it created for that service. The subscription was created by hand or by another service |
 
 ---
 
 ## 🧩 Things worth knowing
 
 <details>
+<summary><b>Retries are safe</b></summary>
+
+<br>
+
+WiseCP's module queue runs a failed creation again. The module saves the username and the encrypted
+password before it calls the panel, so a retry reuses them: an account that was created but whose
+response was lost is adopted instead of failing on *already exists*. Termination of an account that is
+already gone counts as done.
+
+</details>
+
+<details>
 <summary><b>Panel differences</b></summary>
 
 <br>
 
-- **Termination on Plesk is ownership-verified.** Every account the module opens is tagged with an
-  internal id; that tag is checked before any operation, so the module can never be pointed at a
-  subscription created by hand in the panel.
-- **Changing the domain of a live service is refused on Plesk.** A Plesk subscription is found by
-  its domain, so editing it would make every later operation fail permanently. On cPanel the domain
-  can be edited; the account keeps serving the old domain until you change it in the panel.
+- **Every Plesk operation is ownership-verified.** The customer the module creates carries the
+  service number as its external id, and that tag is checked before any operation. The module can
+  never act on a subscription created by hand.
+- **Changing the domain of a live Plesk service** is not carried to the panel: a Plesk subscription is
+  found by its domain, so later operations will report that no subscription exists. Rename the
+  subscription in Plesk as well. On cPanel the account keeps serving the old domain until you change
+  it in the panel.
 - **Duplicate domain protection.** Termination is refused while the same domain is still attached to
   another active or suspended service on the same server.
 
@@ -201,13 +210,13 @@ your DNAHosting server. The module then draws its own fields:
 
 <br>
 
-The panel type is never configured. On the first call the module probes the server and remembers
-which panel answered.
+The panel type is never configured. On the first call the module probes the server and remembers for
+a week which panel answered; **Test Connection** always probes again.
 
 The port only decides which panel is tried **first**: `8443` and `8880` try Plesk first, anything
-else tries cPanel first. The decision itself always comes from a real API call, and the other panel
-is tried when the first guess does not answer. A wrong port slows detection down, it does not break
-it.
+else tries cPanel first. A wrong guess slows detection down, it does not break it. While detecting,
+the module sends the configured credential to the other panel's API endpoint on the **same** server
+as well; it never contacts any other host.
 
 </details>
 
@@ -217,10 +226,36 @@ it.
 <br>
 
 Both panels take their credential in the **Password** field, which WiseCP stores encrypted. The
-**Access Hash** field is never used by this module and is not shown on DNAHosting servers.
+**Access Hash** field is stored as plain text, so this module does not offer it and never reads it.
+On Plesk the module tries the credential as a secret key first and falls back to the login and
+password on its own.
 
-On Plesk the module first tries the credential as an API key and falls back to HTTP basic auth on
-its own, so you do not have to tell it which one you entered.
+</details>
+
+<details>
+<summary><b>WiseCP 3</b></summary>
+
+<br>
+
+The WiseCP 3 package (`v3/coremio/`) offers the same provisioning on WiseCP 3's own screens:
+
+1. **Products / Services → Hosting/Server → Shared Server Settings → Add New Shared Server.** Choose
+   `DNAHosting` as **Server Automation Type** and fill in **IP Address**, **Username**, **Password**
+   (the WHM API token, the Plesk secret key or the Plesk password), **Connect with SSL** and **Port**
+   (`2087` for cPanel, `8443` for Plesk). The **Hostname** field there is only a label; the module
+   connects to **IP Address**. Press **Test Connection**.
+2. **Products / Services → Hosting/Server → Web Hosting Packages** → open the package → **Module
+   Settings** tab. Pick the server or group; the module shows the **Detected panel** and the
+   **Package / Plan** list.
+
+Differences from the WiseCP 5 package:
+
+- WiseCP 3 has no certificate verification switch for server modules. When the server's
+  **Hostname** is a full host name the panel's certificate covers, the package connects to it and
+  verifies the certificate; with only an IP address it connects to the IP without verification.
+- The client area shows disk and bandwidth usage and a button to log in to the panel; WiseCP 5's
+  service overview cards do not exist on WiseCP 3.
+- Changing the domain of a live service is refused on Plesk instead of being left to the operator.
 
 </details>
 
@@ -229,9 +264,10 @@ its own, so you do not have to tell it which one you entered.
 
 <br>
 
-Email account and forwarder management, selling reseller accounts, importing existing accounts into
-WiseCP, and a *log in to the root panel* button in the admin area. The module holds a **reseller**
-credential only — never root — so there is no root panel for it to open.
+Email, database and file management tools, selling reseller accounts, importing existing accounts
+into WiseCP, and a *log in as the server administrator* button. The module holds a **reseller**
+credential only, never root. Importing is left out on purpose: an imported Plesk subscription would
+not carry this module's ownership tag, and every later operation on it would be refused.
 
 </details>
 

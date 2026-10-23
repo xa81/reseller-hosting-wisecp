@@ -4,15 +4,22 @@ defined("CORE_FOLDER") or exit("You can not get in here!");
 class DNAHosting_Http
 {
     private $base;
+    private $verify    = false;
     private $timeout   = 30;
     private $transport = null;
     private $logger    = null;
     private $secrets   = array();
     private $redactions = array();
 
-    public function __construct($baseUrl)
+    /**
+     * @param string $baseUrl scheme://host:port
+     * @param bool   $verify  verify the TLS certificate; on when the module connects
+     *                        to a host name (see DNAHosting_Support::host())
+     */
+    public function __construct($baseUrl, $verify = false)
     {
-        $this->base = rtrim($baseUrl, '/');
+        $this->base   = rtrim($baseUrl, '/');
+        $this->verify = (bool) $verify;
     }
 
     public function setTransport(callable $transport)
@@ -33,20 +40,32 @@ class DNAHosting_Http
         return $this;
     }
 
+    /**
+     * Registers a secret in every form it can take in a request: as typed, URL-encoded
+     * (cPanel form bodies and query strings) and XML-escaped (Plesk packets).
+     */
     public function addSecret($value)
     {
         $value = (string) $value;
-        if (strlen($value) >= 4) {
-            $this->secrets[] = $value;
+        if (strlen($value) < 4) {
+            return $this;
+        }
+        $forms = array($value, urlencode($value), rawurlencode($value),
+            htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+        foreach ($forms as $form) {
+            $this->secrets[$form] = true;
         }
         return $this;
     }
 
     public function mask($text)
     {
-        $text = (string) $text;
-        foreach ($this->secrets as $secret) {
-            $text = str_replace($secret, '***', $text);
+        $text    = (string) $text;
+        $secrets = array_keys($this->secrets);
+        // Longest first, so a secret that contains another is masked whole.
+        usort($secrets, function ($a, $b) { return strlen((string) $b) - strlen((string) $a); });
+        foreach ($secrets as $secret) {
+            $text = str_replace((string) $secret, '***', $text);
         }
         return $text;
     }
@@ -91,7 +110,7 @@ class DNAHosting_Http
         foreach ($this->redactions[$action] as $pattern => $replacement) {
             $replaced = preg_replace($pattern, $replacement, $body);
             if ($replaced === null) {
-                return '[yanit gizlendi: redaksiyon uygulanamadi]';
+                return '[response hidden: redaction failed]';
             }
             $body = $replaced;
         }
@@ -123,10 +142,10 @@ class DNAHosting_Http
             . ($body !== null && $body !== '' ? "\n\n" . $this->stringify($body) : ''));
 
         if (!empty($result['error'])) {
-            $this->log($action, $logRequest, $this->mask('TASIMA HATASI: ' . $result['error']));
+            $this->log($action, $logRequest, $this->mask('TRANSPORT ERROR: ' . $result['error']));
             // Mesaj $this->error e, oradan admin arayuzune ve openPanel() uzerinden
             // musterinin tarayicisina kadar gidiyor; log gibi o da maskelenmeli.
-            throw new DNAHosting_Exception($this->mask($result['error']));
+            throw new DNAHosting_Exception(DNAHosting_Support::t('error-transport', $this->mask($result['error'])));
         }
 
         $status = (int) $result['status'];
@@ -135,9 +154,11 @@ class DNAHosting_Http
         // Redaksiyon YALNIZCA log ve hata kopyasina uygulanir: cagirana ham govde
         // doner, yoksa oturum URLsi ayristirilamazdi.
         $safeBody = $this->redactResponse($action, $rbody);
-        $this->log($action, $logRequest, $this->mask('HTTP ' . $status . "\n\n" . $safeBody));
+        // Log entries keep the first 2000 characters of a body.
+        $logBody  = strlen($safeBody) > 2000 ? self::summarise($safeBody, 2000) : $safeBody;
+        $this->log($action, $logRequest, $this->mask('HTTP ' . $status . "\n\n" . $logBody));
 
-        if ($status >= 400) {
+        if ($status >= 400 || $status === 0) {
             // Ozet de redakte edilmis govdeden alinir: bu metin hata mesaji olarak
             // admin arayuzune ve musterinin tarayicisina kadar gidiyor.
             $summary = self::summarise($safeBody);
@@ -186,8 +207,8 @@ class DNAHosting_Http
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->verify);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->verify ? 2 : 0);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
         curl_setopt($ch, CURLOPT_TIMEOUT, (int) $timeout);
         if ($headers) {

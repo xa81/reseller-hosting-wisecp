@@ -75,9 +75,7 @@ class DNAHosting_Detector
             return $found;
         }
 
-        throw new DNAHosting_Exception(
-            'Sunucuda ne cPanel ne Plesk yanit verdi. ' . implode(' | ', $failures)
-        );
+        throw new DNAHosting_Exception(DNAHosting_Support::t('error-no-panel', implode(' | ', $failures)));
     }
 
     private function readCache($key)
